@@ -69,4 +69,47 @@ const product_By_Id=async (req,res) => {
     
 }
 
-module.exports={get_All_Products,product_By_Id}
+const searchProduct=async (req,res) => {
+
+    try {
+
+        const {keyword}=req.query;
+
+        if(!keyword){
+
+            req.status(402).json({
+
+                success:false,
+                message:"cant search"
+            })
+        }
+
+        const products=await Product.find({
+
+            $or:[
+
+                {name:{ $regex:keyword, $options:'i'}},
+                {description:{$regex:keyword,$options:'i'}},
+                { category: { $regex: keyword, $options: 'i' } }
+            ]
+        });
+
+         res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products,
+    });
+        
+        
+    } catch (error) {
+
+        res.status(500).json({
+      success: false,
+      message: 'Search failed',
+      error: error.message})
+        
+    }
+    
+}
+
+module.exports={get_All_Products,product_By_Id,searchProduct};
