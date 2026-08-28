@@ -4,6 +4,7 @@ const Product_roter = require('../src/routes/Product_route');
 const catalogAgent = require('../src/routes/catalog_agent_router');
 const auth_route = require('./routes/auth_routes');;
 const{protect}=require('../src/middlewares/authorization_middleware');
+const agent_route = require('../src/routes/agent_route');
 
 const Cart_route = require('./routes/Cart_route');
 
@@ -22,6 +23,8 @@ app.use('/api/catalog/agent',catalogAgent);
 app.use('/api/cart',Cart_route);
 
 app.use('/api/auth',auth_route);
+
+app.use('/api/agent',agent_route);
 
 app.get('/health',(req,res)=>{
 

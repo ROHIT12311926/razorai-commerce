@@ -77,7 +77,7 @@ const searchProduct=async (req,res) => {
 
         if(!keyword){
 
-            req.status(402).json({
+            res.status(402).json({
 
                 success:false,
                 message:"cant search"

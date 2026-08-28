@@ -11,7 +11,7 @@ const connectDB=async () => {
         
     } catch (error) {
 
-        console.log("Not succesfull Mdbatlas");
+        console.log("Not succesfull Mdbatlas",error);
         process.exit(1);
         
     }
