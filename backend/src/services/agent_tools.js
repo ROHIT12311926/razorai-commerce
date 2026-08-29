@@ -1,27 +1,30 @@
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
 
-
 const toolDefinitions = [
   {
     functionDeclarations: [
       {
         name: 'search_products',
-        description: 'Search for products in the catalog by keyword (name, description, or category)',
+        description:
+          'Search for products in the catalog by keyword (name, description, or category)',
         parameters: {
           type: 'object',
           properties: {
             keyword: {
               type: 'string',
-              description: 'The search term, e.g. "keyboard", "wireless mouse"',
+              description:
+                'The search term, e.g. "keyboard", "wireless mouse"',
             },
           },
           required: ['keyword'],
         },
       },
+
       {
         name: 'get_product_details',
-        description: 'Get full details of a specific product using its ID',
+        description:
+          'Get full details of a specific product using its ID',
         parameters: {
           type: 'object',
           properties: {
@@ -33,6 +36,7 @@ const toolDefinitions = [
           required: ['productId'],
         },
       },
+
       {
         name: 'add_to_cart',
         description: 'Add a product to the customer cart',
@@ -55,6 +59,7 @@ const toolDefinitions = [
   },
 ];
 
+// ==================== SEARCH PRODUCTS ====================
 
 const executeSearchProducts = async ({ keyword }) => {
   const products = await Product.find({
@@ -74,11 +79,15 @@ const executeSearchProducts = async ({ keyword }) => {
   }));
 };
 
+// ==================== GET PRODUCT DETAILS ====================
+
 const executeGetProductDetails = async ({ productId }) => {
   const product = await Product.findById(productId);
 
   if (!product) {
-    return { error: 'Product not found' };
+    return {
+      error: 'Product not found',
+    };
   }
 
   return {
@@ -91,21 +100,36 @@ const executeGetProductDetails = async ({ productId }) => {
   };
 };
 
-const executeAddToCart = async ({ productId, quantity = 1 }, sessionId) => {
+// ==================== ADD TO CART ====================
+
+const executeAddToCart = async (
+  { productId, quantity = 1 },
+  sessionId
+) => {
   const product = await Product.findById(productId);
 
   if (!product) {
-    return { error: 'Product not found' };
+    return {
+      error: 'Product not found',
+    };
   }
 
   if (product.stock < quantity) {
-    return { error: `Only ${product.stock} units available in stock` };
+    return {
+      error: `Only ${product.stock} units available in stock`,
+    };
   }
 
-  let cart = await Cart.findOne({ session_id: sessionId, status: 'active' });
+  let cart = await Cart.findOne({
+    session_id: sessionId,
+    status: 'active',
+  });
 
   if (!cart) {
-    cart = await Cart.create({ session_id: sessionId, item: [] });
+    cart = await Cart.create({
+      session_id: sessionId,
+      item: [],
+    });
   }
 
   const existingItemIndex = cart.item.findIndex(
@@ -124,9 +148,17 @@ const executeAddToCart = async ({ productId, quantity = 1 }, sessionId) => {
 
   await cart.save();
 
+  // Calculate current cart total
+  const totalAmount = cart.item.reduce(
+    (total, item) =>
+      total + item.priceAtAdd * item.quantity,
+    0
+  );
+
   return {
     success: true,
     message: `Added ${quantity} x ${product.name} to cart`,
+    totalAmount: totalAmount,
   };
 };
 

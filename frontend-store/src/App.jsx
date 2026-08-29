@@ -1,9 +1,16 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ProductListing from './pages/ProductListing';
+import ProductDetail from './pages/ProductDetail';
+
 function App() {
   return (
-    <h1 className="text-3xl font-bold text-blue-600 text-center mt-10">
-      RazorAI Commerce - Tailwind Working!
-    </h1>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<ProductListing />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
