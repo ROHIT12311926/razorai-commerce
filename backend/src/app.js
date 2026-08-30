@@ -8,6 +8,8 @@ const agent_route = require('../src/routes/agent_route');
 
 const Cart_route = require('./routes/Cart_route');
 
+const Order_route= require('./routes/Order_route');
+
 require('dotenv').config();
 
 const connectDB = require('./config/db');
@@ -25,6 +27,8 @@ app.use('/api/cart',Cart_route);
 app.use('/api/auth',auth_route);
 
 app.use('/api/agent',agent_route);
+
+app.use('/api/order',Order_route);
 
 app.get('/health',(req,res)=>{
 
