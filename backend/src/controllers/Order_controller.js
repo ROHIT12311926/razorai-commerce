@@ -1,11 +1,15 @@
 const Cart = require('../models/Cart');
 const Order = require('../models/Order');
 
+const {logEvent} = require('../services/audit_service');
+
 require('dotenv').config();
 
 const {createRazorpayOrder} = require('../services/razorpay_service');
 
 const {checkTransactionLimit}=require('../services/guardrails_service');
+
+const {verifyPaymentSignature} = require('../services/razorpay_service');
 
 const initiateCheckout=async (req,res) => {
 
@@ -38,7 +42,7 @@ const initiateCheckout=async (req,res) => {
     
     );
 
-    const guardrailCheck=await checkTransactionLimit(total);
+    const guardrailCheck=await checkTransactionLimit(total,sessionId);
 
     const order=await Order.create({
 
@@ -50,12 +54,37 @@ const initiateCheckout=async (req,res) => {
       required_Approval: guardrailCheck.requiresApproval
     });
 
+
+    await logEvent({
+      action: 'checkout_initiated',
+      actor: 'customer',
+      amount: total,
+      reason: `Checkout started with ${orderItems.length} item(s)`,
+      relatedOrder: order._id,
+      sessionId: sessionId,
+      approvalStatus: guardrailCheck.requiresApproval ? 'pending' : 'not_required',
+      result: 'success',
+    });
+
     if(!guardrailCheck.requiresApproval){
 
         const razorpayOrder=await createRazorpayOrder(total,order._id.toString());
 
         order.razorpay_order_Id = razorpayOrder.id;
       await order.save();
+
+
+
+      await logEvent({
+        action: 'payment_order_created',
+        actor: 'system',
+        amount: total,
+        reason: 'Razorpay order created, within autonomous limit',
+        relatedOrder: order._id,
+        sessionId: sessionId,
+        result: 'success',
+      });
+
 
        return res.status(200).json({
         success: true,
@@ -116,8 +145,7 @@ const approveOrder = async (req, res) => {
       });
     }
 
-    order.status = 'approved';
-    await order.save();
+    
 
 
     const razorpayOrder = await createRazorpayOrder(order.total_price, order._id.toString());
@@ -125,6 +153,24 @@ const approveOrder = async (req, res) => {
     order.status = 'approved';
     order.razorpay_order_Id = razorpayOrder.id;
     await order.save();
+
+
+    order.status = 'approved';
+    await order.save();
+
+     await logEvent({
+      action: 'payment_approved',
+      actor: 'customer',
+      amount: order.total_price,
+      reason: 'Customer approved the transaction above autonomous limit',
+      relatedOrder: order._id,
+      sessionId: order.session_Id,
+      approvalStatus: 'approved',
+      result: 'success',
+    });
+
+
+
 
     res.status(200).json({
       success: true,
@@ -145,5 +191,110 @@ const approveOrder = async (req, res) => {
   }
 };
 
-module.exports = { initiateCheckout, approveOrder };
+const verifyPayment = async (req, res) => {
+  try {
+    const { orderId, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    const isValid = verifyPaymentSignature(
+      order.razorpay_order_Id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
+
+
+    if (!isValid) {
+      order.status = 'failed';
+      await order.save();
+
+
+       await logEvent({
+        action: 'payment_verification',
+        actor: 'system',
+        amount: order.total_price,
+        reason: 'Signature verification failed - possible tampering or invalid payment',
+        relatedOrder: order._id,
+        sessionId: order.session_Id,
+        result: 'failure',
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification failed',
+      });
+    }
+
+    order.status = 'paid';
+    order.razorpay_payment_id = razorpay_payment_id;
+    await order.save();
+
+     await logEvent({
+      action: 'order_created',
+      actor: 'system',
+      amount: order.total_price,
+      reason: 'Payment verified successfully, order marked as paid',
+      relatedOrder: order._id,
+      sessionId: order.session_Id,
+      result: 'success',
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment verified successfully',
+      data: order,
+    });
+
+
+
+}
+catch(error){
+
+    console.log("VERIFY PAYMENT ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Payment verification failed',
+      error: error.message,
+    });
+
+}
+
+}
+
+const getOrderById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const order = await Order.findById(orderId).populate('item.product');
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch order',
+      error: error.message,
+    });
+  }
+};
+
+
+module.exports = { initiateCheckout, approveOrder,verifyPayment,getOrderById };
 

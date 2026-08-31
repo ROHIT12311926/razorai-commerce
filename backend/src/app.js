@@ -9,6 +9,8 @@ const agent_route = require('../src/routes/agent_route');
 const Cart_route = require('./routes/Cart_route');
 
 const Order_route= require('./routes/Order_route');
+const auditRoutes = require('./routes/audit_routes');
+
 
 require('dotenv').config();
 
@@ -23,6 +25,7 @@ app.use('/api/products',Product_roter);
 app.use('/api/catalog/agent',catalogAgent);
 
 app.use('/api/cart',Cart_route);
+app.use('/api/audit', auditRoutes);
 
 app.use('/api/auth',auth_route);
 

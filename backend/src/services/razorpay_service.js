@@ -1,5 +1,6 @@
 const Razorpay = require('razorpay');
 require('dotenv').config();
+const crypto=require('crypto');
 
 const razorpayInstance=new Razorpay({
 
@@ -20,4 +21,13 @@ const createRazorpayOrder = async (amount, receiptId) => {
 
 }
 
-module.exports = { createRazorpayOrder };
+const verifyPaymentSignature=(orderId, paymentId, signature)=>{
+
+    const body=orderId+'|'+paymentId;
+
+    const expectedSignature=crypto.createHmac('sha256',process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
+
+    return expectedSignature === signature;
+}
+
+module.exports = { createRazorpayOrder , verifyPaymentSignature};
