@@ -6,10 +6,13 @@ const auth_route = require('./routes/auth_routes');;
 const{protect}=require('../src/middlewares/authorization_middleware');
 const agent_route = require('../src/routes/agent_route');
 
+const dashboardRoutes = require('./routes/dashboard_routes');
+
 const Cart_route = require('./routes/Cart_route');
 
 const Order_route= require('./routes/Order_route');
 const auditRoutes = require('./routes/audit_routes');
+const merchantRoutes = require('./routes/merchant_routes');
 
 
 require('dotenv').config();
@@ -32,6 +35,10 @@ app.use('/api/auth',auth_route);
 app.use('/api/agent',agent_route);
 
 app.use('/api/order',Order_route);
+
+app.use('/api/dashboard',dashboardRoutes);
+
+app.use('/api/merchant', merchantRoutes);
 
 app.get('/health',(req,res)=>{
 
