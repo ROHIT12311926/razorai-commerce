@@ -3,6 +3,8 @@ import {  get_All_Products, searchProduct  } from '../api/products';
 import ProductCard from '../components/ProductCard';
 import ChatInterface from '../components/ChatInterface';
 
+import { Link } from 'react-router-dom';
+
 function ProductListing() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,12 @@ function ProductListing() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">Our Products</h1>
+      <div className="flex justify-between items-center mb-4">
+  <h1 className="text-2xl font-bold text-gray-800">Our Products</h1>
+  <Link to="/cart" className="text-blue-600 hover:underline">
+    View Cart 🛒
+  </Link>
+</div>
 
       <div className="mb-8">
         <ChatInterface />
