@@ -55,6 +55,21 @@ const toolDefinitions = [
           required: ['productId'],
         },
       },
+
+      {
+  name: 'remove_from_cart',
+  description: 'Remove a product from the customer cart',
+  parameters: {
+    type: 'object',
+    properties: {
+      productId: {
+        type: 'string',
+        description: 'The MongoDB ID of the product to remove',
+      },
+    },
+    required: ['productId'],
+  },
+},
     ],
   },
 ];
@@ -162,9 +177,60 @@ const executeAddToCart = async (
   };
 };
 
+const executeRemoveFromCart = async ({ productId }, sessionId) => {
+  try {
+    console.log('=== REMOVE CART ===');
+    console.log('productId:', productId);
+    console.log('sessionId:', sessionId);
+
+    const cart = await Cart.findOne({
+      session_id: sessionId,
+      status: 'active',
+    });
+
+    console.log('cart:', cart);
+
+    if (!cart) {
+      return {
+        error: 'Cart not found',
+      };
+    }
+
+    const itemExists = cart.item.some(
+      (item) => item.product.toString() === productId
+    );
+
+    if (!itemExists) {
+      return {
+        error: 'Item not found in cart',
+      };
+    }
+
+    cart.item = cart.item.filter(
+      (item) => item.product.toString() !== productId
+    );
+
+    await cart.save();
+
+    return {
+      success: true,
+      message: 'Item removed from cart',
+    };
+
+  } catch (error) {
+    console.log('REMOVE CART ERROR:', error);
+
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
 module.exports = {
   toolDefinitions,
   executeSearchProducts,
   executeGetProductDetails,
   executeAddToCart,
+  executeRemoveFromCart
 };

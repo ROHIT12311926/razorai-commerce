@@ -7,6 +7,7 @@ const {
   executeSearchProducts,
   executeGetProductDetails,
   executeAddToCart,
+  executeRemoveFromCart
 } = require('./agent_tools');
 
 const ai = new GoogleGenAI({
@@ -19,6 +20,7 @@ Your job is to:
 - Help customers find products that match their needs using the search_products tool
 - Use get_product_details when you need more info about a specific product
 - Use add_to_cart when the customer confirms they want to buy something
+- Use remove_from_cart when the customer asks to remove an item from their cart
 - Recommend the best products within their budget
 - Suggest relevant add-on products when appropriate
 - Be friendly, concise, and helpful
@@ -40,6 +42,10 @@ const executeToolCall = async (functionCall, sessionId) => {
     return await executeAddToCart(args, sessionId);
   }
 
+   if (name === 'remove_from_cart') {
+    return await executeRemoveFromCart(args, sessionId);
+  }
+
   return { error: 'Unknown tool' };
 };
 
@@ -59,7 +65,7 @@ const chatWithTools = async (userMessage, sessionId) => {
 
   // 2. Gemini ko request
   let response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
+    model: 'gemini-flash-lite-latest',
 
     contents,
 
