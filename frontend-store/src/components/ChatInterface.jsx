@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { sendMessageToAgent } from '../api/agent';
+import { verifyPayment } from '../api/order';
 import { getSessionId } from '../utils/session';
 
 function ChatInterface() {
@@ -12,6 +14,7 @@ function ChatInterface() {
   const messagesEndRef = useRef(null);
 
   const sessionId = getSessionId();
+  const navigate = useNavigate();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -22,6 +25,40 @@ function ChatInterface() {
       scrollToBottom();
     }
   }, [messages, isOpen]);
+
+  const openRazorpayCheckout = (paymentInfo) => {
+    const options = {
+      key: paymentInfo.razorpayKeyId,
+      amount: paymentInfo.totalAmount * 100,
+      currency: 'INR',
+      name: 'RazorAI Commerce',
+      description: 'TechStore Purchase',
+      order_id: paymentInfo.razorpayOrderId,
+      handler: async function (response) {
+        try {
+          const verifyResult = await verifyPayment({
+            orderId: paymentInfo.orderId,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+
+          if (verifyResult.success) {
+            navigate('/order-success', { state: { orderId: paymentInfo.orderId } });
+          } else {
+            navigate('/order-failed', { state: { orderId: paymentInfo.orderId } });
+          }
+        } catch (err) {
+          navigate('/order-failed', { state: { orderId: paymentInfo.orderId } });
+        }
+      },
+      theme: {
+        color: '#2563eb',
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -38,6 +75,10 @@ function ChatInterface() {
 
       if (response.success) {
         setMessages((prev) => [...prev, { role: 'assistant', text: response.reply }]);
+
+        if (response.paymentInfo) {
+          openRazorpayCheckout(response.paymentInfo);
+        }
       } else {
         setMessages((prev) => [...prev, { role: 'assistant', text: 'Sorry, I had trouble responding. Please try again.' }]);
       }
