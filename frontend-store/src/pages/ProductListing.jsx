@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { get_All_Products, searchProduct } from '../api/products';
+import {  get_All_Products, searchProduct  } from '../api/products';
 import ProductCard from '../components/ProductCard';
+import ChatInterface from '../components/ChatInterface';
 
 function ProductListing() {
   const [products, setProducts] = useState([]);
@@ -46,6 +47,10 @@ function ProductListing() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-4">Our Products</h1>
+
+      <div className="mb-8">
+        <ChatInterface />
+      </div>
 
       <form onSubmit={handleSearch} className="flex gap-2 mb-6">
         <input
