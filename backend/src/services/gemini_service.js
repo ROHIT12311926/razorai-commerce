@@ -2,6 +2,8 @@ require('dotenv').config();
 
 const { GoogleGenAI } = require('@google/genai');
 
+const Conversation = require('../models/Conversations');
+
 const {
   toolDefinitions,
   executeSearchProducts,
@@ -33,7 +35,7 @@ Your job is to:
 - Never invent products, prices, stock, or discounts
 - Do not repeatedly suggest upsells after the customer declines
 - Be friendly, concise, and helpful
-When add_to_cart returns thresholdInfo, pay attention to thresholdInfo.nudge and naturally communicate that nudge to the customer.
+- When add_to_cart returns thresholdInfo, pay attention to thresholdInfo.nudge and naturally communicate that nudge to the customer.
 - If the nudge suggests adding more items, do not automatically add anything. Let the customer decide.
 - Never claim Free Delivery or autonomous checkout is available unless the thresholdInfo confirms it.
 
@@ -54,43 +56,71 @@ const executeToolCall = async (functionCall, sessionId) => {
     return await executeAddToCart(args, sessionId);
   }
 
-   if (name === 'remove_from_cart') {
+  if (name === 'remove_from_cart') {
     return await executeRemoveFromCart(args, sessionId);
   }
 
-   if (name === 'checkout') {
+  if (name === 'checkout') {
     return await executeCheckout(args, sessionId);
   }
 
   if (name === 'get_upsell_recommendations') {
-  return await handleGetUpsellRecommendations(args);
-}
+    return await handleGetUpsellRecommendations(args);
+  }
 
-if (name === 'check_cart_thresholds') {
-  return checkCartThresholds(args.cartTotal);
-}
+  if (name === 'check_cart_thresholds') {
+    return checkCartThresholds(args.cartTotal);
+  }
 
   return { error: 'Unknown tool' };
 };
+
 
 const chatWithTools = async (userMessage, sessionId) => {
 
   let paymentInfo = null;
 
+  // ==========================================
+  // 1. GET OR CREATE CONVERSATION
+  // ==========================================
 
-  // 1. User ka message
-  const contents = [
-    {
-      role: 'user',
-      parts: [
-        {
-          text: userMessage,
-        },
-      ],
-    },
-  ];
+  let conversation = await Conversation.findOne({ sessionId });
 
-  // 2. Gemini ko request
+  if (!conversation) {
+    conversation = await Conversation.create({
+      sessionId,
+      messages: [],
+    });
+  }
+
+  // ==========================================
+  // 2. ADD USER MESSAGE TO HISTORY
+  // ==========================================
+
+  conversation.messages.push({
+    role: 'user',
+    parts: [
+      {
+        text: userMessage,
+      },
+    ],
+  });
+
+  await conversation.save();
+
+  // ==========================================
+  // 3. CONVERT DB HISTORY TO GEMINI CONTENTS
+  // ==========================================
+
+  const contents = conversation.messages.map((message) => ({
+    role: message.role,
+    parts: message.parts,
+  }));
+
+  // ==========================================
+  // 4. FIRST GEMINI REQUEST
+  // ==========================================
+
   let response = await ai.models.generateContent({
     model: 'gemini-flash-lite-latest',
 
@@ -102,33 +132,53 @@ const chatWithTools = async (userMessage, sessionId) => {
     },
   });
 
-  // 3. Gemini ke response ke parts
   let parts = response.candidates[0].content.parts;
 
-  // 4. Jab tak Gemini tool call karta rahe
+  // ==========================================
+  // 5. TOOL CALL LOOP
+  // ==========================================
+
   while (true) {
 
     const functionCallPart = parts.find(
       (part) => part.functionCall
     );
 
-    // Agar function call nahi hai,
-    // iska matlab final text mil gaya
-    if (!functionCallPart) {
-      return {
+    // ========================================
+    // NO TOOL CALL → FINAL RESPONSE
+    // ========================================
 
-        reply: response.text,
-    paymentInfo: paymentInfo,
+    if (!functionCallPart) {
+
+      const assistantText = response.text;
+
+      // Save final assistant response
+      conversation.messages.push({
+        role: 'model',
+        parts: parts,
+      });
+
+      await conversation.save();
+
+      return {
+        reply: assistantText,
+        paymentInfo,
       };
     }
 
-    // 5. Gemini ne kaunsa function call kiya?
+    // ========================================
+    // GEMINI TOOL CALL
+    // ========================================
+
     const functionCall = functionCallPart.functionCall;
 
     console.log('=== FUNCTION CALL ===');
     console.log(functionCall);
 
-    // 6. Apna actual backend function execute karo
+    // ========================================
+    // EXECUTE TOOL
+    // ========================================
+
     const toolResult = await executeToolCall(
       functionCall,
       sessionId
@@ -137,34 +187,71 @@ const chatWithTools = async (userMessage, sessionId) => {
     console.log('=== TOOL RESULT ===');
     console.log(toolResult);
 
-    if (functionCall.name === 'checkout' && toolResult.success) {
-  paymentInfo = toolResult;
-}
+    // ========================================
+    // CHECKOUT PAYMENT INFO
+    // ========================================
 
-    // 7. Gemini ke previous response ko conversation mein add karo
+    if (
+      functionCall.name === 'checkout' &&
+      toolResult.success
+    ) {
+      paymentInfo = toolResult;
+    }
+
+    // ========================================
+    // ADD GEMINI TOOL CALL TO DB HISTORY
+    // ========================================
+
+    conversation.messages.push({
+      role: 'model',
+      parts: parts,
+    });
+
+    // ========================================
+    // ADD TOOL RESULT TO DB HISTORY
+    // ========================================
+
+    const functionResponsePart = {
+      functionResponse: {
+        name: functionCall.name,
+        response: {
+          result: toolResult,
+        },
+      },
+    };
+
+    conversation.messages.push({
+      role: 'user',
+      parts: [
+        functionResponsePart,
+      ],
+    });
+
+    await conversation.save();
+
+    // ========================================
+    // ADD TO CURRENT GEMINI CONTEXT
+    // ========================================
+
     contents.push({
       role: 'model',
       parts: parts,
     });
 
-    // 8. Tool ka result Gemini ko do
     contents.push({
       role: 'user',
       parts: [
-        {
-          functionResponse: {
-            name: functionCall.name,
-            response: {
-              result: toolResult,
-            },
-          },
-        },
+        functionResponsePart,
       ],
     });
 
-    // 9. Gemini ko dobara call karo
+    // ========================================
+    // ASK GEMINI AGAIN
+    // ========================================
+
     response = await ai.models.generateContent({
       model: 'gemini-flash-lite-latest',
+
       contents,
 
       config: {
@@ -173,9 +260,11 @@ const chatWithTools = async (userMessage, sessionId) => {
       },
     });
 
-    // 10. New response ke parts nikalo
     parts = response.candidates[0].content.parts;
   }
 };
 
-module.exports = { chatWithTools };
+
+module.exports = {
+  chatWithTools,
+};
