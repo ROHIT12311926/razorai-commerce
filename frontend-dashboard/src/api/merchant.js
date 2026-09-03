@@ -1,5 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { removeToken } from '../utils/auth';
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000/api';
 
 function DashboardLayout() {
   const navigate = useNavigate();
