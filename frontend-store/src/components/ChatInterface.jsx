@@ -1,80 +1,71 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
 import { sendMessageToAgent } from '../api/agent';
 import { verifyPayment } from '../api/order';
 import { getSessionId } from '../utils/session';
 
-const API_BASE_URL = 'http://localhost:5000/api';
-
 function ChatInterface() {
   const [isOpen, setIsOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [approvalRequest, setApprovalRequest] = useState(null);
 
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: "Hi! I'm RazorAI, your shopping assistant. What are you looking for today?",
+      text: "Hey! I'm RazorAI 👋\nYour personal AI shopping assistant. What are you looking for today?",
     },
   ]);
 
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  // Customer confirmation state
-  const [confirmation, setConfirmation] = useState(null);
-  const [confirming, setConfirming] = useState(false);
-
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const sessionId = getSessionId();
   const navigate = useNavigate();
 
-  // =====================================================
-  // SCROLL CHAT
-  // =====================================================
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-    });
-  };
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({
+          behavior: 'smooth',
+        });
+      }, 50);
+    }
+  }, [messages, loading, isOpen, approvalRequest]);
 
   useEffect(() => {
     if (isOpen) {
-      scrollToBottom();
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
     }
-  }, [messages, isOpen]);
-
-  // =====================================================
-  // OPEN RAZORPAY
-  // =====================================================
+  }, [isOpen]);
 
   const openRazorpayCheckout = (paymentInfo) => {
-    if (!paymentInfo?.razorpayOrderId) {
-      console.error('Invalid payment information:', paymentInfo);
-
-      setMessages((prev) => [
-        ...prev,
+    if (!window.Razorpay) {
+      setMessages((previous) => [
+        ...previous,
         {
           role: 'assistant',
-          text: 'I could not start the payment. Please try again.',
+          text: 'Payment system is not loaded. Please refresh the page and try again.',
         },
       ]);
+      return;
+    }
 
+    if (
+      !paymentInfo?.razorpayOrderId ||
+      !paymentInfo?.razorpayKeyId
+    ) {
       return;
     }
 
     const options = {
       key: paymentInfo.razorpayKeyId,
-
-      amount: paymentInfo.totalAmount * 100,
-
-      currency: paymentInfo.currency || 'INR',
-
+      amount: Number(paymentInfo.totalAmount) * 100,
+      currency: 'INR',
       name: 'RazorAI Commerce',
-
       description: 'TechStore Purchase',
-
       order_id: paymentInfo.razorpayOrderId,
 
       handler: async function (response) {
@@ -100,11 +91,8 @@ function ChatInterface() {
               },
             });
           }
-        } catch (err) {
-          console.error(
-            'Payment verification error:',
-            err
-          );
+        } catch (error) {
+          console.error('Payment verification error:', error);
 
           navigate('/order-failed', {
             state: {
@@ -114,226 +102,98 @@ function ChatInterface() {
         }
       },
 
+      modal: {
+        ondismiss: function () {
+          setMessages((previous) => [
+            ...previous,
+            {
+              role: 'assistant',
+              text: 'Payment window closed. Your order is still available if you want to try again.',
+            },
+          ]);
+        },
+      },
+
       theme: {
         color: '#2563eb',
       },
     };
 
-    const rzp = new window.Razorpay(options);
+    const razorpay = new window.Razorpay(options);
 
-    rzp.open();
+    razorpay.open();
   };
 
-  // =====================================================
-  // CUSTOMER CONFIRMATION API
-  // =====================================================
-
-  const confirmPurchase = async () => {
-  if (!confirmation?.orderId) {
-    console.error('No order ID found');
-    return;
-  }
-
-  setConfirming(true);
-
-  try {
-    console.log('=== CONFIRMING PURCHASE ===');
-    console.log('Order ID:', confirmation.orderId);
-
-   const response = await fetch(
-  `${API_BASE_URL}/order/${confirmation.orderId}/approve`,
-  {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  }
-);
-
-const rawResponse = await response.text();
-
-console.log('APPROVE STATUS:', response.status);
-console.log('APPROVE RAW RESPONSE:', rawResponse);
-
-let data;
-
-try {
-  data = JSON.parse(rawResponse);
-} catch (error) {
-  throw new Error(
-    `Backend returned non-JSON response (${response.status}): ${rawResponse.slice(0, 150)}`
-  );
-}
-
-if (!response.ok || !data.success) {
-  throw new Error(data.message || 'Purchase confirmation failed');
-}
-
-    setConfirmation(null);
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: 'assistant',
-        text:
-          'Purchase confirmed! Opening secure Razorpay Checkout...',
-      },
-    ]);
-
-    openRazorpayCheckout({
-      orderId: data.data.orderId,
-      razorpayOrderId: data.data.razorpayOrderId,
-      totalAmount: data.data.totalAmount,
-      razorpayKeyId: data.data.razorpayKeyId,
-    });
-
-  } catch (error) {
-
-    console.error(
-      '=== CONFIRM PURCHASE ERROR ==='
-    );
-
-    console.error(error);
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: 'assistant',
-        text:
-          `Purchase confirmation failed: ${error.message}`,
-      },
-    ]);
-
-  } finally {
-    setConfirming(false);
-  }
-};
-
-  // =====================================================
-  // CANCEL CUSTOMER CONFIRMATION
-  // =====================================================
-
-  const cancelPurchase = () => {
-    setConfirmation(null);
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: 'assistant',
-        text:
-          'No problem. I have not proceeded with the payment.',
-      },
-    ]);
-  };
-
-  // =====================================================
-  // SEND MESSAGE
-  // =====================================================
-
-  const handleSend = async (e) => {
-    e.preventDefault();
-
-    if (!input.trim() || loading) {
+  const processAgentMessage = async (message) => {
+    if (!message || loading) {
       return;
     }
 
-    const userInput = input.trim();
-
-    const userMessage = {
-      role: 'user',
-      text: userInput,
-    };
-
-    setMessages((prev) => [
-      ...prev,
-      userMessage,
+    setMessages((previous) => [
+      ...previous,
+      {
+        role: 'user',
+        text: message,
+      },
     ]);
 
-    setInput('');
     setLoading(true);
 
     try {
-      const response =
-        await sendMessageToAgent(
-          userInput,
-          sessionId
-        );
-
-      console.log(
-        '=== AGENT RESPONSE ==='
+      const response = await sendMessageToAgent(
+        message,
+        sessionId
       );
 
-      console.log(response);
-
-      if (response.success) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            text: response.reply,
-          },
-        ]);
-
-        // =================================================
-        // CUSTOMER CONFIRMATION REQUIRED
-        // =================================================
-
-        if (
-          response.paymentInfo
-            ?.requiresConfirmation
-        ) {
-          setConfirmation({
-            orderId:
-              response.paymentInfo.orderId,
-
-            totalAmount:
-              response.paymentInfo.totalAmount,
-
-            transactionLimit:
-              response.paymentInfo
-                .transactionLimit,
-
-            reason:
-              response.paymentInfo.reason,
-          });
-        }
-
-        // =================================================
-        // NORMAL RAZORPAY PAYMENT
-        // =================================================
-
-        else if (
-          response.paymentInfo &&
-          !response.paymentInfo
-            .requiresConfirmation
-        ) {
-          openRazorpayCheckout(
-            response.paymentInfo
-          );
-        }
-      } else {
-        setMessages((prev) => [
-          ...prev,
+      if (!response.success) {
+        setMessages((previous) => [
+          ...previous,
           {
             role: 'assistant',
             text:
               response.message ||
-              'Sorry, I had trouble responding. Please try again.',
+              'Sorry, I could not process that request. Please try again.',
           },
         ]);
-      }
-    } catch (error) {
-      console.error(
-        'CHAT ERROR:',
-        error
-      );
 
-      setMessages((prev) => [
-        ...prev,
+        return;
+      }
+
+      setMessages((previous) => [
+        ...previous,
         {
           role: 'assistant',
           text:
-            'Something went wrong. Please try again.',
+            response.reply ||
+            'Done! How else can I help you?',
+        },
+      ]);
+
+      const paymentInfo = response.paymentInfo;
+
+      if (
+        paymentInfo?.requiresConfirmation === true
+      ) {
+        setApprovalRequest(paymentInfo);
+        return;
+      }
+
+      if (
+        paymentInfo &&
+        paymentInfo.requiresConfirmation !== true &&
+        paymentInfo.razorpayOrderId &&
+        paymentInfo.razorpayKeyId
+      ) {
+        openRazorpayCheckout(paymentInfo);
+      }
+    } catch (error) {
+      console.error('AI Agent Error:', error);
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: 'assistant',
+          text: 'Something went wrong. Please try again.',
         },
       ]);
     } finally {
@@ -341,232 +201,339 @@ if (!response.ok || !data.success) {
     }
   };
 
-  // =====================================================
-  // UI
-  // =====================================================
+  const handleSend = async (event) => {
+    event?.preventDefault();
+
+    const message = input.trim();
+
+    if (!message || loading) {
+      return;
+    }
+
+    setInput('');
+
+    await processAgentMessage(message);
+  };
+
+  const handleConfirmOrder = async () => {
+    if (loading || !approvalRequest) {
+      return;
+    }
+
+    setApprovalRequest(null);
+
+    await processAgentMessage(
+      'Yes, I confirm this order. Please proceed with the purchase.'
+    );
+  };
+
+  const handleCancelOrder = () => {
+    if (loading) {
+      return;
+    }
+
+    setApprovalRequest(null);
+
+    setMessages((previous) => [
+      ...previous,
+      {
+        role: 'assistant',
+        text: 'No problem. I have not proceeded with the payment. Your cart is still available.',
+      },
+    ]);
+  };
+
+  const handleSuggestion = (text) => {
+    setInput(text);
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
+
+  const suggestions = [
+    'Find a gaming keyboard',
+    'Best mouse under ₹1500',
+    'Show me headphones',
+  ];
+
+  const renderMessage = (text) => {
+    if (!text) {
+      return null;
+    }
+
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+
+    return parts.map((part, index) => {
+      if (
+        part.startsWith('**') &&
+        part.endsWith('**')
+      ) {
+        return (
+          <strong key={index}>
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+
+      return <span key={index}>{part}</span>;
+    });
+  };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-6 right-6 z-[100]">
+      {isOpen && (
+        <div className="mb-4 flex h-[620px] max-h-[calc(100vh-110px)] w-[calc(100vw-32px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_80px_rgba(15,23,42,0.25)] sm:w-[430px]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-blue-700 px-5 py-5 text-white">
+            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-blue-400/20 blur-2xl" />
 
-      {/* ================================================
-          CUSTOMER CONFIRMATION MODAL
-      ================================================= */}
+            <div className="absolute -bottom-16 -left-10 h-32 w-32 rounded-full bg-purple-500/20 blur-2xl" />
 
-      {confirmation && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-
-          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-
-            {/* Header */}
-
-            <div className="border-b border-gray-200 px-6 py-5">
-
+            <div className="relative flex items-center justify-between">
               <div className="flex items-center gap-3">
-
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-xl">
-                  🛒
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-xl shadow-lg backdrop-blur-md">
+                  ✦
                 </div>
 
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">
-                    Confirm Your Purchase
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold tracking-tight">
+                      RazorAI
+                    </h2>
 
-                  <p className="text-sm text-gray-500">
-                    Customer confirmation required
-                  </p>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* Body */}
-
-            <div className="px-6 py-6">
-
-              <p className="text-sm leading-6 text-gray-600">
-                Your cart total is
-                <span className="font-bold text-gray-900">
-                  {' '}₹
-                  {Number(
-                    confirmation.totalAmount
-                  ).toLocaleString('en-IN')}
-                </span>
-                .
-              </p>
-
-              <div className="mt-4 rounded-xl bg-yellow-50 border border-yellow-200 p-4">
-
-                <p className="text-sm font-medium text-yellow-800">
-                  This purchase exceeds the
-                  autonomous checkout limit of
-                  ₹
-                  {Number(
-                    confirmation.transactionLimit ||
-                      2000
-                  ).toLocaleString('en-IN')}
-                  .
-                </p>
-
-                <p className="mt-2 text-sm text-yellow-700">
-                  RazorAI needs your confirmation
-                  before creating the payment order.
-                </p>
-
-              </div>
-
-              <p className="mt-5 text-sm font-semibold text-gray-800">
-                Do you want to proceed with this purchase?
-              </p>
-
-            </div>
-
-            {/* Buttons */}
-
-            <div className="flex gap-3 border-t border-gray-200 px-6 py-5">
-
-              <button
-                type="button"
-                onClick={cancelPurchase}
-                disabled={confirming}
-                className="flex-1 rounded-xl border border-gray-300 px-4 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmPurchase}
-                disabled={confirming}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-              >
-                {confirming
-                  ? 'Confirming...'
-                  : 'Confirm Purchase'}
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-      {/* ================================================
-          CHAT WINDOW
-      ================================================= */}
-
-      {isOpen && (
-        <div className="mb-3 flex h-[500px] w-80 flex-col rounded-xl border border-gray-200 bg-white shadow-2xl sm:w-96">
-
-          {/* Header */}
-
-          <div className="flex items-center justify-between rounded-t-xl bg-blue-600 px-4 py-3 text-white">
-
-            <h2 className="font-semibold">
-              Chat with RazorAI
-            </h2>
-
-            <button
-              onClick={() => setIsOpen(false)}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-white hover:bg-blue-700"
-            >
-              ✕
-            </button>
-
-          </div>
-
-          {/* Messages */}
-
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
-
-            {messages.map(
-              (msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    msg.role === 'user'
-                      ? 'justify-end'
-                      : 'justify-start'
-                  }`}
-                >
-
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                      msg.role === 'user'
-                        ? 'rounded-br-none bg-blue-600 text-white'
-                        : 'rounded-bl-none bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {msg.text}
+                    <span className="rounded-full bg-blue-400/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-blue-100">
+                      AI
+                    </span>
                   </div>
 
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-blue-100/80">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" />
+                    Online & ready to help
+                  </div>
                 </div>
-              )
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="relative flex-1 overflow-y-auto bg-slate-50 px-4 py-5">
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`mb-4 flex ${
+                  message.role === 'user'
+                    ? 'justify-end'
+                    : 'justify-start'
+                }`}
+              >
+                {message.role === 'assistant' && (
+                  <div className="mr-2 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-sm text-white shadow-sm">
+                    ✦
+                  </div>
+                )}
+
+                <div
+                  className={`max-w-[80%] px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                    message.role === 'user'
+                      ? 'rounded-2xl rounded-br-md bg-blue-600 text-white'
+                      : 'rounded-2xl rounded-bl-md border border-slate-200 bg-white text-slate-700'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">
+                    {renderMessage(message.text)}
+                  </div>
+
+                  <div
+                    className={`mt-1.5 text-[9px] ${
+                      message.role === 'user'
+                        ? 'text-blue-100'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {message.role === 'assistant'
+                      ? 'RazorAI'
+                      : 'You'}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {messages.length === 1 && !loading && (
+              <div className="mt-5">
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Try asking
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map((suggestion) => (
+                    <button
+                      type="button"
+                      key={suggestion}
+                      onClick={() =>
+                        handleSuggestion(suggestion)
+                      }
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {loading && (
-              <div className="flex justify-start">
-
-                <div className="rounded-2xl rounded-bl-none bg-gray-100 px-4 py-2 text-gray-500">
-                  Typing...
+              <div className="mb-4 flex justify-start">
+                <div className="mr-2 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-sm text-white">
+                  ✦
                 </div>
 
+                <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
+
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
+                </div>
               </div>
             )}
 
             <div ref={messagesEndRef} />
-
           </div>
 
-          {/* Input */}
-
-          <form
-            onSubmit={handleSend}
-            className="flex gap-2 border-t border-gray-200 p-3"
-          >
-
-            <input
-              type="text"
-              value={input}
-              onChange={(e) =>
-                setInput(e.target.value)
-              }
-              placeholder="Ask about products..."
-              className="flex-1 rounded-full border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              disabled={loading}
-            />
-
-            <button
-              type="submit"
-              disabled={
-                loading ||
-                !input.trim()
-              }
-              className="rounded-full bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:bg-gray-300"
+          <div className="border-t border-slate-200 bg-white p-3">
+            <form
+              onSubmit={handleSend}
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 transition focus-within:border-blue-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50"
             >
-              Send
-            </button>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(event) =>
+                  setInput(event.target.value)
+                }
+                placeholder="Ask RazorAI anything..."
+                disabled={loading}
+                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
 
-          </form>
+              <button
+                type="submit"
+                disabled={
+                  loading ||
+                  !input.trim()
+                }
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm transition-all hover:bg-blue-700 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+              >
+                ↑
+              </button>
+            </form>
 
+            <div className="mt-2 text-center text-[9px] text-slate-400">
+              Powered by RazorAI • Secure AI commerce
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ================================================
-          CHAT BUTTON
-      ================================================= */}
+      {approvalRequest && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_100px_rgba(15,23,42,0.3)]">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 px-6 py-6">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-2xl">
+                🛡️
+              </div>
+
+              <h3 className="mt-4 text-xl font-bold text-slate-900">
+                Confirmation required
+              </h3>
+
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                This purchase is above RazorAI's autonomous checkout limit. Your confirmation is required before payment can proceed.
+              </p>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">
+                    Order total
+                  </span>
+
+                  <span className="text-2xl font-bold text-slate-900">
+                    ₹
+                    {Number(
+                      approvalRequest.totalAmount || 0
+                    ).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
+                  <span className="text-xs text-slate-500">
+                    Autonomous limit
+                  </span>
+
+                  <span className="text-xs font-semibold text-slate-700">
+                    ₹
+                    {Number(
+                      approvalRequest.transactionLimit ||
+                        2000
+                    ).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs leading-relaxed text-slate-500">
+                By confirming, you are explicitly asking RazorAI to proceed with this purchase.
+              </p>
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancelOrder}
+                  disabled={loading}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmOrder}
+                  disabled={loading}
+                  className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading
+                    ? 'Processing...'
+                    : 'Confirm Order'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
-        onClick={() =>
-          setIsOpen(!isOpen)
-        }
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-2xl text-white shadow-lg transition-transform hover:scale-110 hover:bg-blue-700"
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="Open RazorAI"
+        className="group relative flex h-16 w-16 items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-2xl text-white shadow-[0_12px_35px_rgba(37,99,235,0.35)] transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-[0_18px_45px_rgba(37,99,235,0.45)]"
       >
-        {isOpen ? '✕' : '💬'}
-      </button>
+        {!isOpen && (
+          <span className="absolute inset-0 animate-ping rounded-[22px] bg-blue-400/30 opacity-30" />
+        )}
 
+        <span className="relative z-10 transition-transform duration-300 group-hover:rotate-12">
+          {isOpen ? '✕' : '✦'}
+        </span>
+      </button>
     </div>
   );
 }
