@@ -1,5 +1,22 @@
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
+const crypto = require('crypto');
+
+const Order = require('../models/Order');
+const { checkTransactionLimit } = require('../services/guardrails_service');
+const { createRazorpayOrder } = require('../services/razorpay_service');
+const { logEvent } = require('../services/audit_service');
+
+const generateCheckoutSignature = (sessionId, cartItems) => {
+  const sortedItems = cartItems
+    .map((item) => `${item.product._id}:${item.quantity}`)
+    .sort()
+    .join('|');
+
+    const rawString = `${sessionId}|${sortedItems}`;
+
+    return crypto.createHash('sha256').update(rawString).digest('hex');
+};
 
 const toolDefinitions = [
   {
@@ -68,6 +85,16 @@ const toolDefinitions = [
       },
     },
     required: ['productId'],
+  },
+},
+
+{
+  name: 'checkout',
+  description:
+    'Initiate checkout and payment for the current cart. ONLY call this when the customer explicitly says things like "buy this", "checkout", "pay now", or "purchase everything in my cart". Do not call this just because items were added to cart.',
+  parameters: {
+    type: 'object',
+    properties: {},
   },
 },
     ],
@@ -227,10 +254,130 @@ const executeRemoveFromCart = async ({ productId }, sessionId) => {
   }
 };
 
+// ==================== CHECKOUT ====================
+
+const executeCheckout = async (args, sessionId) => {
+  try {
+    const cart = await Cart.findOne({
+      session_id: sessionId,
+      status: 'active',
+    }).populate('item.product');
+
+    if (!cart || cart.item.length === 0) {
+      return { error: 'Cart is empty, nothing to checkout' };
+    }
+
+     const signature = generateCheckoutSignature(sessionId, cart.item);
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
+    const existingOrder = await Order.findOne({
+      session_Id: sessionId,
+      checkoutSignature: signature,
+      createdAt: { $gte: twoMinutesAgo },
+    });
+
+    if (existingOrder) {
+      console.log('=== DUPLICATE CHECKOUT DETECTED, RETURNING EXISTING ORDER ===');
+
+      if (existingOrder.required_Approval) {
+        return {
+          success: true,
+          requiresApproval: true,
+          totalAmount: existingOrder.total_price,
+          message: 'This checkout is already pending approval. Please check the Checkout page.',
+        };
+      }
+
+      return {
+        success: true,
+        requiresApproval: false,
+        orderId: existingOrder._id.toString(),
+        razorpayOrderId: existingOrder.razorpay_order_Id,
+        razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+        totalAmount: existingOrder.total_price,
+        message: 'Payment is already ready. Opening secure Razorpay Checkout.',
+      };
+    }
+
+    let total = 0;
+    const orderItems = cart.item.map((item) => {
+      total += item.priceAtAdd * item.quantity;
+      return {
+        product: item.product._id,
+        name: item.product.name,
+        quantity: item.quantity,
+        price: item.priceAtAdd,
+      };
+    });
+
+    const guardrailCheck = await checkTransactionLimit(total, sessionId);
+
+    const order = await Order.create({
+      session_Id: sessionId,
+      item: orderItems,
+      total_price: total,
+      razorpay_order_Id: `pending_${Date.now()}`,
+      status: 'created',
+      required_Approval: guardrailCheck.requiresApproval,
+       checkoutSignature: signature,
+    });
+
+    await logEvent({
+      action: 'checkout_initiated',
+      actor: 'ai',
+      amount: total,
+      reason: `AI-initiated checkout with ${orderItems.length} item(s)`,
+      relatedOrder: order._id,
+      sessionId: sessionId,
+      approvalStatus: guardrailCheck.requiresApproval ? 'pending' : 'not_required',
+      result: 'success',
+    });
+
+    if (guardrailCheck.requiresApproval) {
+      return {
+        success: true,
+        requiresApproval: true,
+        totalAmount: total,
+        reason: guardrailCheck.reason,
+        message:
+          'This amount exceeds the autonomous limit and requires human approval. Please go to the Checkout page to approve.',
+      };
+    }
+
+    const razorpayOrder = await createRazorpayOrder(total, order._id.toString());
+    order.razorpay_order_Id = razorpayOrder.id;
+    await order.save();
+
+    await logEvent({
+      action: 'payment_order_created',
+      actor: 'system',
+      amount: total,
+      reason: 'Razorpay order created via AI checkout, within autonomous limit',
+      relatedOrder: order._id,
+      sessionId: sessionId,
+      result: 'success',
+    });
+
+    return {
+      success: true,
+      requiresApproval: false,
+      orderId: order._id.toString(),
+      razorpayOrderId: razorpayOrder.id,
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+      totalAmount: total,
+      message: 'Payment is ready. Opening secure Razorpay Checkout.',
+    };
+  } catch (error) {
+    console.log('CHECKOUT TOOL ERROR:', error);
+    return { error: error.message };
+  }
+};
+
 module.exports = {
   toolDefinitions,
   executeSearchProducts,
   executeGetProductDetails,
   executeAddToCart,
-  executeRemoveFromCart
+  executeRemoveFromCart,
+  executeCheckout,
 };

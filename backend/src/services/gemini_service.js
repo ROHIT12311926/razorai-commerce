@@ -7,7 +7,8 @@ const {
   executeSearchProducts,
   executeGetProductDetails,
   executeAddToCart,
-  executeRemoveFromCart
+  executeRemoveFromCart,
+  executeCheckout
 } = require('./agent_tools');
 
 const ai = new GoogleGenAI({
@@ -21,6 +22,9 @@ Your job is to:
 - Use get_product_details when you need more info about a specific product
 - Use add_to_cart when the customer confirms they want to buy something
 - Use remove_from_cart when the customer asks to remove an item from their cart
+- Use checkout when the customer explicitly asks to buy, checkout, pay, or purchase the items in the cart
+- Never call checkout automatically just because items are added to the cart
+- If checkout requires approval, clearly tell the customer that human approval is required
 - Recommend the best products within their budget
 - Suggest relevant add-on products when appropriate
 - Be friendly, concise, and helpful
@@ -46,10 +50,17 @@ const executeToolCall = async (functionCall, sessionId) => {
     return await executeRemoveFromCart(args, sessionId);
   }
 
+   if (name === 'checkout') {
+    return await executeCheckout(args, sessionId);
+  }
+
   return { error: 'Unknown tool' };
 };
 
 const chatWithTools = async (userMessage, sessionId) => {
+
+  let paymentInfo = null;
+
 
   // 1. User ka message
   const contents = [
@@ -88,7 +99,11 @@ const chatWithTools = async (userMessage, sessionId) => {
     // Agar function call nahi hai,
     // iska matlab final text mil gaya
     if (!functionCallPart) {
-      return response.text;
+      return {
+
+        reply: response.text,
+    paymentInfo: paymentInfo,
+      };
     }
 
     // 5. Gemini ne kaunsa function call kiya?
@@ -105,6 +120,10 @@ const chatWithTools = async (userMessage, sessionId) => {
 
     console.log('=== TOOL RESULT ===');
     console.log(toolResult);
+
+    if (functionCall.name === 'checkout' && toolResult.success) {
+  paymentInfo = toolResult;
+}
 
     // 7. Gemini ke previous response ko conversation mein add karo
     contents.push({

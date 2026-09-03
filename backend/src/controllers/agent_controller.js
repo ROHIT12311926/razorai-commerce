@@ -11,19 +11,27 @@ const chatWithAgent = async (req, res) => {
       });
     }
 
-    const aiReply = await chatWithTools(message, sessionId);
+    const result = await chatWithTools(message, sessionId);
+
+    console.log('=== AGENT RESULT ===');
+console.log(result);
 
     res.status(200).json({
       success: true,
-      reply: aiReply,
+      reply: result.reply,
+      paymentInfo: result.paymentInfo,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'AI agent failed to respond',
-      error: error.message,
-    });
-  }
+  console.error('=== AGENT CONTROLLER ERROR ===');
+  console.error(error);
+  console.error(error.stack);
+
+  res.status(500).json({
+    success: false,
+    message: 'AI agent failed to respond',
+    error: error.message,
+  });
+}
 };
 
 module.exports = { chatWithAgent };
