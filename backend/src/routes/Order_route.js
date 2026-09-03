@@ -1,13 +1,44 @@
 const express = require('express');
 
-const router=express.Router();
-const {initiateCheckout,approveOrder,verifyPayment,getOrderById}=require('../controllers/Order_controller');
+const router = express.Router();
 
-router.get('/:orderId',getOrderById);
+const {
+  initiateCheckout,
+  confirmOrder,
+  rejectOrder,
+  verifyPayment,
+  getOrderById,
+} = require('../controllers/Order_controller');
 
-router.post('/checkout',initiateCheckout);
-router.post('/:orderId/approve',approveOrder);
 
-router.post('/verify-payment', verifyPayment);
+router.get(
+  '/:orderId',
+  getOrderById
+);
 
-module.exports=router;
+
+router.post(
+  '/checkout',
+  initiateCheckout
+);
+
+
+router.post(
+  '/:orderId/approve',
+  confirmOrder
+);
+
+
+router.post(
+  '/:orderId/reject',
+  rejectOrder
+);
+
+
+router.post(
+  '/verify-payment',
+  verifyPayment
+);
+
+
+module.exports = router;

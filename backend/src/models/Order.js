@@ -1,110 +1,88 @@
 const mongoose = require('mongoose');
-const Product = require('./Product');
 
-const orderItemSchema=new mongoose.Schema({
-
-    product:{
-
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'Product',
-        required:true
+const orderItemSchema = new mongoose.Schema(
+  {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      required: true,
     },
 
-    name:{
-        type:String,
-        required:true
+    name: {
+      type: String,
+      required: true,
     },
 
-    quantity:{
-
-        type:Number,
-        required:true,
-        min:1
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
     },
 
-    price:{
-
-        type:String,
-        required:true
-    }
-
-
-},{
-    id:false
-})
-
-const orderSchema=new mongoose.Schema({
-
-    session_Id:{
-
-        type:String,
-        required:true
+    price: {
+      type: Number,
+      required: true,
     },
-
-    item:{
-
-        type:[orderItemSchema],
-        required:true
-    },
-
-    total_price:{
-
-        type:Number,
-        required:true,
-        min:0
-    },
-
-    razorpay_order_Id:{
-
-        type:String,
-        required:true
-    },
-
-    razorpay_payment_id:{
-
-        type:String,
-        default:null
-    },
-
-    status:{
-
-        type:String,
-        enum:["created","paid","failed","approved"],
-        default:"created"
-    },
-
-    required_Approval:{
-
-        type:Boolean,
-        default:false
-    },
-    checkoutSignature: {
-    type: String,
-    default: null,
-},
-
-shipping_address: {
-  name: {
-    type: String,
-    default: null
   },
-  city: {
-    type: String,
-    default: null
-  },
-  state: {
-    type: String,
-    default: null
-  },
-  pincode: {
-    type: String,
-    default: null
+  {
+    _id: false,
   }
-},
+);
 
+const orderSchema = new mongoose.Schema(
+  {
+    session_Id: {
+      type: String,
+      required: true,
+    },
 
-},{
-    timestamps:true
-})
+    item: {
+      type: [orderItemSchema],
+      required: true,
+    },
 
-module.exports=mongoose.model('Order',orderSchema);
+    total_price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    razorpay_order_Id: {
+      type: String,
+      default: null,
+    },
+
+    razorpay_payment_id: {
+      type: String,
+      default: null,
+    },
+
+    status: {
+      type: String,
+      enum: [
+        'created',
+        'pending_confirmation',
+        'approved',
+        'paid',
+        'failed',
+        'rejected',
+      ],
+      default: 'created',
+    },
+
+    required_Approval: {
+      type: Boolean,
+      default: false,
+    },
+
+    checkoutSignature: {
+      type: String,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model('Order', orderSchema);
