@@ -83,6 +83,25 @@ const orderSchema=new mongoose.Schema({
     default: null,
 },
 
+shipping_address: {
+  name: {
+    type: String,
+    default: null
+  },
+  city: {
+    type: String,
+    default: null
+  },
+  state: {
+    type: String,
+    default: null
+  },
+  pincode: {
+    type: String,
+    default: null
+  }
+},
+
 
 },{
     timestamps:true

@@ -16,14 +16,23 @@ const checkTransactionLimit=async (totalAmount,sessionId) => {
 
 
   await logEvent({
-    action: 'limit_check',
-    actor: 'system',
-    amount: totalAmount,
-    reason: reason,
-    sessionId: sessionId,
-    approvalStatus: requiresApproval ? 'pending' : 'not_required',
-    result: 'success',
-  });
+  action: 'limit_check',
+  actor: 'system',
+  amount: totalAmount,
+  reason: reason,
+
+  reasoningTrace: requiresApproval
+    ? `Transaction amount ₹${totalAmount} exceeds the autonomous limit of ₹${merchant.transaction_limit}. Human approval is required.`
+    : `Transaction amount ₹${totalAmount} is within the autonomous limit of ₹${merchant.transaction_limit}. Autonomous payment is allowed.`,
+
+  decisionType: requiresApproval
+    ? 'ESCALATED_HUMAN_APPROVAL'
+    : 'AUTONOMOUS_APPROVED',
+
+  sessionId: sessionId,
+  approvalStatus: requiresApproval ? 'pending' : 'not_required',
+  result: 'success',
+});
 
   return {
     requiresApproval,

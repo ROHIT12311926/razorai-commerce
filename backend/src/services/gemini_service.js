@@ -8,7 +8,9 @@ const {
   executeGetProductDetails,
   executeAddToCart,
   executeRemoveFromCart,
-  executeCheckout
+  executeCheckout,
+  handleGetUpsellRecommendations,
+  checkCartThresholds
 } = require('./agent_tools');
 
 const ai = new GoogleGenAI({
@@ -26,8 +28,14 @@ Your job is to:
 - Never call checkout automatically just because items are added to the cart
 - If checkout requires approval, clearly tell the customer that human approval is required
 - Recommend the best products within their budget
-- Suggest relevant add-on products when appropriate
+- After a customer adds a product to the cart, consider using get_upsell_recommendations to suggest 1-2 relevant complementary products
+- Only suggest products returned by the get_upsell_recommendations tool
+- Never invent products, prices, stock, or discounts
+- Do not repeatedly suggest upsells after the customer declines
 - Be friendly, concise, and helpful
+When add_to_cart returns thresholdInfo, pay attention to thresholdInfo.nudge and naturally communicate that nudge to the customer.
+- If the nudge suggests adding more items, do not automatically add anything. Let the customer decide.
+- Never claim Free Delivery or autonomous checkout is available unless the thresholdInfo confirms it.
 
 Always be honest about product availability and pricing. Do not make up products or prices that don't exist.`;
 
@@ -53,6 +61,14 @@ const executeToolCall = async (functionCall, sessionId) => {
    if (name === 'checkout') {
     return await executeCheckout(args, sessionId);
   }
+
+  if (name === 'get_upsell_recommendations') {
+  return await handleGetUpsellRecommendations(args);
+}
+
+if (name === 'check_cart_thresholds') {
+  return checkCartThresholds(args.cartTotal);
+}
 
   return { error: 'Unknown tool' };
 };

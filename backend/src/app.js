@@ -32,7 +32,8 @@ app.use('/api/audit', auditRoutes);
 
 app.use('/api/auth',auth_route);
 
-app.use('/api/agent',agent_route);
+// app.use('/api/agent',agent_route);
+app.use('/api/v1/agent', agent_route);
 
 app.use('/api/order',Order_route);
 

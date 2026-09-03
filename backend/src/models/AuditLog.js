@@ -26,6 +26,11 @@ const AuditLog_Schema=new mongoose.Schema({
       
     },
 
+    reasoningTrace: {
+  type: String,
+  default: '',
+},
+
     relatedProduct:{
 
         type:mongoose.Schema.Types.ObjectId,
@@ -52,6 +57,17 @@ const AuditLog_Schema=new mongoose.Schema({
       enum: ['not_required', 'pending', 'approved', 'rejected'],
       default: 'not_required',
     },
+
+    decisionType: {
+  type: String,
+  enum: [
+    'AUTONOMOUS_APPROVED',
+    'ESCALATED_HUMAN_APPROVAL',
+    'REJECTED_STOCK',
+    'FALLBACK_LINK_GENERATED',
+  ],
+  default: null,
+},
     result: {
       type: String,
       enum: ['success', 'failure'],

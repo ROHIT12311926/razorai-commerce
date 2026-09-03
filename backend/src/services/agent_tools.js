@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
 const crypto = require('crypto');
+const { checkCartThresholds } = require('../services/threshold_service');
 
 const Order = require('../models/Order');
 const { checkTransactionLimit } = require('../services/guardrails_service');
@@ -95,6 +96,42 @@ const toolDefinitions = [
   parameters: {
     type: 'object',
     properties: {},
+  },
+},
+
+{
+  name: 'get_upsell_recommendations',
+  description:
+    'Recommend 1-2 relevant complementary products that are in stock based on the product the customer is interested in. Use this to suggest useful cross-sells and increase cart value.',
+  parameters: {
+    type: 'object',
+    properties: {
+      productId: {
+        type: 'string',
+        description: 'The MongoDB ID of the product the customer is interested in',
+      },
+      category: {
+        type: 'string',
+        description: 'The category of the product',
+      },
+    },
+    required: ['productId', 'category'],
+  },
+},
+
+{
+  name: 'check_cart_thresholds',
+  description:
+    'Check the current cart total against the Free Delivery threshold of ₹1500 and the autonomous checkout limit of ₹2000. Use this after cart changes to provide useful spending nudges.',
+  parameters: {
+    type: 'object',
+    properties: {
+      cartTotal: {
+        type: 'number',
+        description: 'The current total amount of the customer cart',
+      },
+    },
+    required: ['cartTotal'],
   },
 },
     ],
@@ -197,12 +234,17 @@ const executeAddToCart = async (
     0
   );
 
+  const thresholdInfo = checkCartThresholds(totalAmount);
+
   return {
-    success: true,
-    message: `Added ${quantity} x ${product.name} to cart`,
-    totalAmount: totalAmount,
-  };
+  success: true,
+  message: `Added ${quantity} x ${product.name} to cart`,
+  totalAmount: totalAmount,
+  thresholdInfo: thresholdInfo,
 };
+};
+
+
 
 const executeRemoveFromCart = async ({ productId }, sessionId) => {
   try {
@@ -246,6 +288,71 @@ const executeRemoveFromCart = async ({ productId }, sessionId) => {
 
   } catch (error) {
     console.log('REMOVE CART ERROR:', error);
+
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+const handleGetUpsellRecommendations = async ({ productId, category }) => {
+  try {
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return {
+        success: false,
+        error: 'Product not found',
+      };
+    }
+
+    // Complementary category mapping
+    let complementaryCategories = [];
+
+    const productName = product.name.toLowerCase();
+    const productCategory = (product.category || '').toLowerCase();
+
+    if (
+      productName.includes('mouse') ||
+      productCategory.includes('mouse')
+    ) {
+      complementaryCategories = ['keyboard', 'keyboards'];
+    } else if (
+      productName.includes('keyboard') ||
+      productCategory.includes('keyboard')
+    ) {
+      complementaryCategories = ['mouse', 'mice', 'mouse'];
+    }
+
+    const recommendations = await Product.find({
+      _id: { $ne: productId },
+      stock: { $gt: 0 },
+      $or: [
+        ...complementaryCategories.map((cat) => ({
+          category: { $regex: `^${cat}$`, $options: 'i' },
+        })),
+        ...complementaryCategories.map((cat) => ({
+          name: { $regex: cat, $options: 'i' },
+        })),
+      ],
+    })
+      .limit(2)
+      .select('_id name price stock category features');
+
+    return {
+      success: true,
+      recommendations: recommendations.map((item) => ({
+        productId: item._id,
+        name: item.name,
+        price: item.price,
+        stock: item.stock,
+        category: item.category,
+        features: item.features,
+      })),
+    };
+  } catch (error) {
+    console.log('UPSELL RECOMMENDATION ERROR:', error);
 
     return {
       success: false,
@@ -323,15 +430,34 @@ const executeCheckout = async (args, sessionId) => {
     });
 
     await logEvent({
-      action: 'checkout_initiated',
-      actor: 'ai',
-      amount: total,
-      reason: `AI-initiated checkout with ${orderItems.length} item(s)`,
-      relatedOrder: order._id,
-      sessionId: sessionId,
-      approvalStatus: guardrailCheck.requiresApproval ? 'pending' : 'not_required',
-      result: 'success',
-    });
+  action: guardrailCheck.requiresApproval
+    ? 'CHECKOUT_ESCALATED'
+    : 'checkout_initiated',
+
+  actor: 'ai',
+  amount: total,
+
+  reason: guardrailCheck.requiresApproval
+    ? guardrailCheck.reason
+    : `AI-initiated checkout with ${orderItems.length} item(s)`,
+
+  reasoningTrace: guardrailCheck.requiresApproval
+    ? `Cart total ₹${total} exceeds the autonomous limit of ₹2,000. Human approval is required before payment can proceed.`
+    : `Cart total ₹${total} is within the autonomous limit of ₹2,000. AI is allowed to proceed with payment.`,
+
+  decisionType: guardrailCheck.requiresApproval
+    ? 'ESCALATED_HUMAN_APPROVAL'
+    : 'AUTONOMOUS_APPROVED',
+
+  relatedOrder: order._id,
+  sessionId: sessionId,
+
+  approvalStatus: guardrailCheck.requiresApproval
+    ? 'pending'
+    : 'not_required',
+
+  result: 'success',
+});
 
     if (guardrailCheck.requiresApproval) {
       return {
@@ -349,14 +475,22 @@ const executeCheckout = async (args, sessionId) => {
     await order.save();
 
     await logEvent({
-      action: 'payment_order_created',
-      actor: 'system',
-      amount: total,
-      reason: 'Razorpay order created via AI checkout, within autonomous limit',
-      relatedOrder: order._id,
-      sessionId: sessionId,
-      result: 'success',
-    });
+  action: 'payment_order_created',
+  actor: 'system',
+  amount: total,
+
+  reason: 'Razorpay order created via AI checkout, within autonomous limit',
+
+  reasoningTrace:
+    `Cart total ₹${total} was verified to be below the ₹2,000 autonomous spending limit. Razorpay payment order was created successfully.`,
+
+  decisionType: 'AUTONOMOUS_APPROVED',
+
+  relatedOrder: order._id,
+  sessionId: sessionId,
+
+  result: 'success',
+});
 
     return {
       success: true,
@@ -373,6 +507,8 @@ const executeCheckout = async (args, sessionId) => {
   }
 };
 
+
+
 module.exports = {
   toolDefinitions,
   executeSearchProducts,
@@ -380,4 +516,6 @@ module.exports = {
   executeAddToCart,
   executeRemoveFromCart,
   executeCheckout,
+  handleGetUpsellRecommendations,
+  
 };

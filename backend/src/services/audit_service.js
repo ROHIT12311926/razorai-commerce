@@ -9,6 +9,8 @@ const logEvent = async ({
   relatedOrder = null,
   sessionId = null,
   approvalStatus = 'not_required',
+  reasoningTrace = '',
+decisionType = null,
   result,
 }) => {
   try {
@@ -21,6 +23,8 @@ const logEvent = async ({
       relatedOrder,
       sessionId,
       approvalStatus,
+      reasoningTrace,
+decisionType,
       result,
     });
 

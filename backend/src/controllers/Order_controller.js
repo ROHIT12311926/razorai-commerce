@@ -56,15 +56,34 @@ const initiateCheckout=async (req,res) => {
 
 
     await logEvent({
-      action: 'checkout_initiated',
-      actor: 'customer',
-      amount: total,
-      reason: `Checkout started with ${orderItems.length} item(s)`,
-      relatedOrder: order._id,
-      sessionId: sessionId,
-      approvalStatus: guardrailCheck.requiresApproval ? 'pending' : 'not_required',
-      result: 'success',
-    });
+  action: guardrailCheck.requiresApproval
+    ? 'CHECKOUT_ESCALATED'
+    : 'checkout_initiated',
+
+  actor: 'ai',
+  amount: total,
+
+  reason: guardrailCheck.requiresApproval
+    ? guardrailCheck.reason
+    : `AI initiated checkout with ${orderItems.length} item(s)`,
+
+  reasoningTrace: guardrailCheck.requiresApproval
+    ? `Cart total ₹${total} exceeds the autonomous limit of ₹${guardrailCheck.transactionLimit}. Human approval is required before payment can proceed.`
+    : `Cart total ₹${total} is within the autonomous spending limit of ₹${guardrailCheck.transactionLimit}. AI can proceed with Razorpay payment.`,
+
+  decisionType: guardrailCheck.requiresApproval
+    ? 'ESCALATED_HUMAN_APPROVAL'
+    : 'AUTONOMOUS_APPROVED',
+
+  relatedOrder: order._id,
+  sessionId: sessionId,
+
+  approvalStatus: guardrailCheck.requiresApproval
+    ? 'pending'
+    : 'not_required',
+
+  result: 'success',
+});
 
     if(!guardrailCheck.requiresApproval){
 
@@ -75,15 +94,22 @@ const initiateCheckout=async (req,res) => {
 
 
 
-      await logEvent({
-        action: 'payment_order_created',
-        actor: 'system',
-        amount: total,
-        reason: 'Razorpay order created, within autonomous limit',
-        relatedOrder: order._id,
-        sessionId: sessionId,
-        result: 'success',
-      });
+     await logEvent({
+  action: 'payment_order_created',
+  actor: 'system',
+  amount: total,
+
+  reason: 'Razorpay order created within autonomous limit',
+
+  reasoningTrace:
+    `Cart total ₹${total} was verified against the autonomous limit of ₹${guardrailCheck.transactionLimit}. The transaction was approved for autonomous Razorpay checkout.`,
+
+  decisionType: 'AUTONOMOUS_APPROVED',
+
+  relatedOrder: order._id,
+  sessionId: sessionId,
+  result: 'success',
+});
 
 
        return res.status(200).json({
