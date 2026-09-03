@@ -2,7 +2,13 @@ const { chatWithTools } = require('../services/gemini_service');
 
 const chatWithAgent = async (req, res) => {
   try {
+    console.log('=== CHAT REQUEST RECEIVED ===');
+    console.log('BODY:', req.body);
+
     const { message, sessionId } = req.body;
+
+    console.log('MESSAGE:', message);
+    console.log('SESSION:', sessionId);
 
     if (!message || !sessionId) {
       return res.status(400).json({
@@ -11,27 +17,34 @@ const chatWithAgent = async (req, res) => {
       });
     }
 
-    const result = await chatWithTools(message, sessionId);
+    console.log('=== CALLING GEMINI SERVICE ===');
 
-    console.log('=== AGENT RESULT ===');
-console.log(result);
+    const result = await chatWithTools(
+      message,
+      sessionId
+    );
 
-    res.status(200).json({
+    console.log('=== GEMINI RESULT ===');
+    console.log(result);
+
+    return res.status(200).json({
       success: true,
       reply: result.reply,
-      paymentInfo: result.paymentInfo,
+      paymentInfo: result.paymentInfo || null,
     });
   } catch (error) {
-  console.error('=== AGENT CONTROLLER ERROR ===');
-  console.error(error);
-  console.error(error.stack);
+    console.error('=== AGENT CONTROLLER ERROR ===');
+    console.error(error);
+    console.error(error.stack);
 
-  res.status(500).json({
-    success: false,
-    message: 'AI agent failed to respond',
-    error: error.message,
-  });
-}
+    return res.status(500).json({
+      success: false,
+      message: 'AI agent failed to respond',
+      error: error.message,
+    });
+  }
 };
 
-module.exports = { chatWithAgent };
+module.exports = {
+  chatWithAgent,
+};
