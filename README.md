@@ -4,7 +4,7 @@
 
 ### **The AI-native way to shop.**
 
-A conversational AI shopping agent that helps users **discover products, compare options, manage carts, get intelligent recommendations, and initiate secure payments** — all through natural language.
+A conversational AI shopping agent that helps users **discover products, compare options, manage carts, receive intelligent recommendations, and initiate secure payments** — all through natural language.
 
 Built for the **Razorpay AI Buildathon** 🚀
 
@@ -40,7 +40,7 @@ Traditional e-commerce makes users search through products, open product pages, 
 
 **RazorAI changes that interaction.**
 
-Instead of navigating the store manually, users can simply talk to an AI shopping agent.
+Instead of navigating through the store manually, users can simply talk to an AI shopping agent.
 
 ```text
 "I need a wireless mouse under ₹1500"
@@ -48,7 +48,7 @@ Instead of navigating the store manually, users can simply talk to an AI shoppin
 
 RazorAI can understand the request, search the merchant's catalog, recommend suitable products, add the selected product to the cart, and help the user proceed toward checkout.
 
-The important part is that **AI does not get unrestricted control over financial transactions.**
+The key idea is that **AI does not get unrestricted control over financial transactions.**
 
 ```text
 User
@@ -88,17 +88,17 @@ Merchant Dashboard
 
 # ✨ Features
 
-RazorAI's capabilities are divided into six categories so it's easy to understand what the platform provides today and where it can go next.
+RazorAI's capabilities are organized by their role in the overall platform.
 
 ---
 
-## ⭐ Must-Have Features
+# ⭐ Must-Have Features
 
-The core experience that makes RazorAI an AI-powered shopping platform.
+The core features that power the AI shopping experience.
 
 ### 🤖 Conversational Shopping Agent
 
-Users interact with the store using natural language instead of traditional e-commerce navigation.
+Users can interact with the store using natural language instead of traditional e-commerce navigation.
 
 ```text
 "I want a mouse"
@@ -114,15 +114,15 @@ Users interact with the store using natural language instead of traditional e-co
 "Checkout"
 ```
 
-The AI understands the intent and uses the appropriate backend capability.
+The AI understands the user's intent and uses the appropriate backend capability.
 
 ---
 
 ### 🔎 AI Product Discovery
 
-RazorAI searches the actual merchant product catalog when users are looking for products.
+RazorAI searches the actual merchant catalog when users are looking for products.
 
-It can understand requests based on:
+The agent can understand requests based on:
 
 * Product type
 * Category
@@ -130,7 +130,7 @@ It can understand requests based on:
 * User requirements
 * Natural-language descriptions
 
-The AI does **not** invent products or prices.
+The AI does **not** invent products, prices, or stock information.
 
 ---
 
@@ -148,7 +148,7 @@ Users can manage their cart directly through conversation.
 "Add this one"
 ```
 
-Products are only added when the user explicitly requests it.
+Products are only added when the user explicitly requests the action.
 
 ---
 
@@ -166,7 +166,7 @@ Users can initiate checkout naturally:
 "Proceed with the purchase"
 ```
 
-The backend validates the transaction before creating the payment order.
+The backend validates the transaction before creating the Razorpay payment order.
 
 ---
 
@@ -213,17 +213,17 @@ Autonomous limit exceeded
 PENDING_APPROVAL
 ```
 
-This provides a safety boundary between AI decision-making and financial execution.
+This creates a safety boundary between AI decision-making and financial execution.
 
 ---
 
-## 🌟 Nice Features
+# 💰 Revenue & Upselling Features
 
-Features that make the shopping experience smarter and more conversational.
+RazorAI is designed to help merchants increase cart value while keeping recommendations useful and contextual.
 
-### 💡 Intelligent Product Recommendations
+### 🛍️ Smart Product Upselling
 
-After a product is added to the cart, RazorAI can suggest relevant complementary products.
+After a customer adds a product to the cart, RazorAI can suggest relevant complementary products.
 
 Example:
 
@@ -231,32 +231,195 @@ Example:
 Customer adds:
 🖱️ Silent Wireless Mouse
 
-RazorAI can suggest:
+RazorAI suggests:
 🖱️ Gaming Mousepad
 ⌨️ Wireless Keyboard
 ```
 
-Recommendations are generated from products actually available in the merchant catalog.
+Recommendations are based on products actually available in the merchant catalog.
 
 ---
 
-### ⚖️ Product Comparison
+### 🔄 Context-Aware Cross-Selling
 
-Users can ask RazorAI to compare products conversationally.
+RazorAI can suggest products that naturally complement what the customer is already buying.
+
+Examples:
 
 ```text
-"Compare these two mice"
-
-"Which keyboard is better for gaming?"
-
-"What's the difference between these two?"
+Mouse
+  ↓
+Mousepad
 ```
+
+```text
+Keyboard
+  ↓
+Mouse
+```
+
+```text
+Monitor
+  ↓
+Laptop Stand
+```
+
+This creates opportunities for merchants to increase the customer's basket size without forcing irrelevant recommendations.
 
 ---
 
-### 🧠 Conversation Context
+### 🚚 Dynamic Free-Delivery Nudges
 
-RazorAI maintains conversation context so users don't have to repeatedly specify product names.
+RazorAI dynamically checks the customer's cart value and tells them exactly how much more they need to spend to unlock free delivery.
+
+Example:
+
+```text
+Cart Total: ₹899
+
+🛍️ Add ₹601 more to unlock free delivery!
+```
+
+If the cart changes:
+
+```text
+Cart Total: ₹1,700
+
+🛍️ Add ₹300 more to unlock free delivery!
+```
+
+The nudge changes dynamically according to the cart total and configured threshold.
+
+This gives the customer a clear incentive while creating an opportunity for merchants to increase **Average Order Value (AOV)**.
+
+---
+
+### 📈 AOV Optimization
+
+Combining:
+
+```text
+Relevant Upselling
+       +
+Cross-Selling
+       +
+Free-Delivery Nudges
+       ↓
+Higher Basket Value
+```
+
+RazorAI turns the AI assistant into more than a support chatbot — it can also become a conversational sales assistant.
+
+---
+
+### 🎯 Context-Aware Recommendations
+
+Recommendations are connected to the customer's current shopping context.
+
+Instead of randomly suggesting products, RazorAI can use:
+
+* Current product
+* Cart contents
+* Product category
+* Available catalog
+* User's conversation
+
+to provide more relevant suggestions.
+
+---
+
+# 🚀 Extra Features
+
+Features that extend RazorAI beyond a conventional AI shopping chatbot.
+
+### 🤖 Agent-to-Agent Commerce
+
+RazorAI is designed to be accessible by **other AI agents**, not just human users.
+
+A machine-readable catalog is exposed through:
+
+```http
+GET /api/v1/agent/catalog
+```
+
+External agents can discover:
+
+```text
+Merchant
+Products
+Prices
+Stock
+Categories
+Features
+Purchase Support
+Agent Capabilities
+Transaction Limits
+```
+
+External agents can request transactions through:
+
+```http
+POST /api/v1/agent/transact
+```
+
+This creates the foundation for:
+
+> **Agent → Merchant → Payment**
+
+commerce.
+
+---
+
+### 🔗 AI-Readable Merchant Catalog
+
+The merchant exposes structured catalog information that external AI agents can understand without scraping the website.
+
+Example:
+
+```json
+{
+  "agent_purchasable": true,
+  "capabilities": {
+    "catalog": true,
+    "product_search": true,
+    "purchase": true,
+    "razorpay_payment": true,
+    "autonomous_transaction_limit": 2000
+  }
+}
+```
+
+This makes the merchant **AI-readable and AI-purchasable**.
+
+---
+
+### 🔁 Conversational Idempotency
+
+AI agents and users can accidentally repeat checkout requests because of retries, slow responses, or network latency.
+
+RazorAI includes idempotency protection around transaction requests to reduce the risk of duplicate payment-order creation.
+
+```text
+Checkout Request
+      ↓
+Idempotency Check
+      ↓
+Already Processed?
+   ↙          ↘
+ YES          NO
+ ↓             ↓
+Reuse        Process
+Existing     Transaction
+Result
+```
+
+This is especially important when AI is involved in financial workflows.
+
+---
+
+### 🧠 Conversation Memory
+
+RazorAI maintains the ongoing conversation context so users don't have to repeatedly specify product names.
 
 It understands references such as:
 
@@ -293,131 +456,11 @@ Adds the previously discussed mouse.
 
 ---
 
-### 📈 Dynamic Cart Nudges
-
-RazorAI can communicate useful information based on the current cart state.
-
-For example:
-
-```text
-Your current cart total is ₹899.
-
-Add ₹601 more to unlock
-the configured delivery benefit.
-```
-
-The information is generated from backend threshold information rather than being blindly hardcoded into the AI response.
-
----
-
-### 📦 Stock & Product Validation
-
-Before processing transactions, the backend validates:
-
-* Product existence
-* Purchase availability
-* Quantity
-* Current stock
-* Product price
-
-This prevents the AI from purchasing products that aren't actually available.
-
----
-
-## 🚀 Extra Features
-
-Features that push RazorAI beyond a normal AI chatbot.
-
-### 🤖 Agent-to-Agent Commerce
-
-RazorAI is designed to be accessible by **other AI agents**, not just human users.
-
-A machine-readable catalog is exposed through:
-
-```http
-GET /api/v1/agent/catalog
-```
-
-External agents can discover:
-
-```text
-Merchant
-Products
-Prices
-Stock
-Categories
-Features
-Purchase support
-Agent capabilities
-Transaction limits
-```
-
-An external agent can then request a purchase through:
-
-```http
-POST /api/v1/agent/transact
-```
-
-This creates the foundation for:
-
-> **Agent → Merchant → Payment**
-
-commerce.
-
----
-
-### 🔗 AI-Readable Merchant Catalog
-
-The merchant exposes structured catalog information that an AI agent can understand without scraping the website.
-
-Example:
-
-```json
-{
-  "agent_purchasable": true,
-  "capabilities": {
-    "catalog": true,
-    "product_search": true,
-    "purchase": true,
-    "razorpay_payment": true,
-    "autonomous_transaction_limit": 2000
-  }
-}
-```
-
-This makes the merchant **AI-readable and AI-purchasable**.
-
----
-
-### 🔁 Conversational Idempotency
-
-AI agents and users can accidentally repeat the same checkout request because of retries, slow responses, or network latency.
-
-RazorAI includes idempotency protection around transaction requests to reduce the risk of duplicate payment-order creation.
-
-```text
-Checkout Request
-      ↓
-Idempotency Check
-      ↓
-Already processed?
-   ↙          ↘
- YES          NO
- ↓             ↓
-Reuse        Process
-existing     transaction
-result
-```
-
-This is particularly important when AI is involved in financial workflows.
-
----
-
 # 🔮 Seeing the Future
 
 RazorAI is built around the idea that **AI agents will become a new interface for commerce.**
 
-Today:
+### Today's Commerce
 
 ```text
 Human
@@ -429,7 +472,7 @@ Product
 Checkout
 ```
 
-The future:
+### Agentic Commerce
 
 ```text
 User
@@ -456,9 +499,9 @@ and purchase it if you find a suitable one."
 
 The AI agent could discover compatible merchants, evaluate their catalogs, select a product, and request a transaction.
 
-The merchant's backend would still enforce its own rules before allowing the transaction.
+The merchant backend would still enforce its own rules before allowing the transaction.
 
-### The bigger idea
+### The Bigger Idea
 
 RazorAI is not only an AI shopping assistant.
 
@@ -549,69 +592,37 @@ The AI cannot override the merchant's actual stock state.
 
 ---
 
-# 💰 Revenue-Impacting Features for Merchants
+# 🏪 Merchant Value
 
-RazorAI is designed not only to automate shopping, but also to create opportunities for merchants to increase conversions and order value.
+RazorAI gives the merchant a dedicated operational layer instead of making the AI the only interface.
 
-### 📈 Reduced Purchase Friction
+### 📊 Merchant Visibility
 
-Traditional flow:
+The merchant can monitor the commerce activity generated through RazorAI from the dedicated dashboard.
 
-```text
-Search
- ↓
-Filter
- ↓
-Open Product
- ↓
-Compare
- ↓
-Add to Cart
- ↓
-Checkout
-```
+### 📈 Conversion Opportunities
 
-RazorAI:
+The combination of:
 
 ```text
-"I need a good gaming mouse under ₹2000"
-                ↓
-        AI understands intent
-                ↓
-        Products suggested
-                ↓
-          Add to cart
-                ↓
-             Checkout
+Conversational Discovery
+        +
+Upselling
+        +
+Cross-Selling
+        +
+Free-Delivery Nudges
+        +
+Low-Friction Checkout
 ```
 
-Fewer interaction steps can create a smoother buying experience.
+creates multiple opportunities to improve the shopping journey and increase order value.
 
 ---
 
-### 🛍️ Cross-Selling & Upselling
+### 🤖 New AI Commerce Channel
 
-When a customer purchases or adds a product, RazorAI can suggest complementary products.
-
-Example:
-
-```text
-Mouse
-  ↓
-Mousepad
-  ↓
-Keyboard
-```
-
-This creates opportunities to increase:
-
-**Average Order Value (AOV)**
-
----
-
-### 🤖 AI Commerce Channel
-
-The A2A capability allows external AI agents to interact with the merchant's catalog and transaction API.
+A2A support allows external AI agents to interact with the merchant's catalog and transaction API.
 
 Instead of relying only on:
 
@@ -666,7 +677,7 @@ Product
 └── Purchase Support
 ```
 
-The same catalog concept powers both:
+The same catalog powers both:
 
 **Human-facing AI shopping**
 
@@ -678,13 +689,13 @@ and
 
 # 📊 Merchant Dashboard
 
-RazorAI includes a separate merchant dashboard:
+RazorAI includes a dedicated merchant dashboard:
 
 ### 📊 https://razorai-commerce-dashboard.onrender.com/
 
-The dashboard gives the merchant visibility into the commerce activity generated by the platform.
+The dashboard provides the merchant with visibility into the commerce activity generated through the platform.
 
-It provides a dedicated view for information such as:
+It includes information such as:
 
 * 📦 Orders
 * 💰 Revenue
@@ -692,9 +703,7 @@ It provides a dedicated view for information such as:
 * 🛒 Transaction information
 * 🤖 Agent-driven commerce activity
 
-### Store → Payment → Dashboard
-
-The complete flow is:
+### 🔄 Store → Payment → Dashboard
 
 ```text
 Customer / AI Agent
@@ -714,9 +723,9 @@ Merchant Dashboard
 Revenue & Order Updates
 ```
 
-When transactions and orders are successfully processed, the corresponding **order and revenue information is reflected in the merchant dashboard**.
+As orders and successful transactions are processed, the corresponding **order and revenue information is reflected in the merchant dashboard**.
 
-This separates the customer shopping experience from the merchant's operational view.
+This gives the merchant a separate operational view from the customer's shopping experience.
 
 ---
 
@@ -737,7 +746,9 @@ Product Selection
         ↓
 Cart Management
         ↓
-Recommendations
+Smart Recommendations
+        ↓
+Dynamic Free-Delivery Nudge
         ↓
 Checkout
         ↓
@@ -752,9 +763,9 @@ Merchant Dashboard
 
 # 💳 How to Test Razorpay Checkout
 
-RazorAI uses **Razorpay Test Mode** for the demonstration.
+RazorAI uses **Razorpay Test Mode** for demonstration purposes.
 
-When the Razorpay test checkout opens, use the following test card:
+When the Razorpay test checkout opens, use:
 
 ```text
 Card Number:
@@ -775,7 +786,7 @@ If the checkout asks for additional test-card fields such as CVV, use the value 
 
 # 🧪 Try These Prompts
 
-Once you open the live store, try:
+Open the live store and try the following.
 
 ### 🔎 Product Discovery
 
@@ -783,13 +794,13 @@ Once you open the live store, try:
 I want a mouse
 ```
 
-### 🎮 Specific Requirements
+### 🎮 Specific Requirement
 
 ```text
 Show me a gaming mouse
 ```
 
-### 💡 Recommendations
+### 💡 Upselling
 
 ```text
 What do you recommend with this?
@@ -801,7 +812,7 @@ What do you recommend with this?
 Add the Silent Wireless Mouse to my cart
 ```
 
-### 🧠 Context
+### 🧠 Conversation Context
 
 ```text
 Tell me about the RGB Gaming Mouse
@@ -813,6 +824,10 @@ Then:
 Add it to my cart
 ```
 
+### 🚚 Dynamic Nudge
+
+Add a product below the free-delivery threshold and observe RazorAI calculate how much more is needed.
+
 ### 💳 Checkout
 
 ```text
@@ -821,7 +836,7 @@ Checkout
 
 ### 🛡️ High-Value Transaction
 
-Try a product above ₹2,000:
+Try:
 
 ```text
 Add the K8 Wireless Mechanical Keyboard
@@ -833,7 +848,7 @@ Then:
 Checkout
 ```
 
-RazorAI will apply the configured transaction guardrail.
+The ₹2,000 transaction guardrail will be applied.
 
 ---
 
@@ -841,7 +856,7 @@ RazorAI will apply the configured transaction guardrail.
 
 ## 🤖 "AI agent failed to respond"
 
-Because the deployed application depends on external AI/API services, temporary failures can occasionally happen.
+The deployed application depends on external AI/API services, so temporary service or network failures can occasionally happen.
 
 If you see:
 
@@ -866,9 +881,9 @@ try:
 Make sure:
 
 * The transaction was successfully created
-* You are using the live deployed frontend
-* The browser is not blocking the checkout
-* The Razorpay environment is in test mode for the demo
+* You are using the deployed frontend
+* Your browser is not blocking the checkout
+* Razorpay is running in test mode for the demo
 
 ---
 
@@ -934,21 +949,19 @@ Make sure:
 
 # 🎯 Why RazorAI?
 
-RazorAI combines three important ideas:
+RazorAI brings together three major pieces:
 
 ### 🤖 AI
 
-Natural-language product discovery and shopping assistance.
+Natural-language product discovery, conversation, recommendations, and shopping assistance.
 
-### 💳 Payments
+### 💳 Commerce
 
 Real payment-order creation through Razorpay's payment infrastructure.
 
-### 🛡️ Safety
+### 🛡️ Trust
 
 Backend-enforced transaction limits, explicit confirmation, stock validation, idempotency, and audit logging.
-
-Together:
 
 ```text
         AI
