@@ -11,8 +11,13 @@ All through a conversational AI agent — with safety built into every transacti
   <a href="https://razorai-commerce-frontend.onrender.com">
     <img src="https://img.shields.io/badge/🚀%20Live%20Demo-RazorAI-0A0A0A?style=for-the-badge" />
   </a>
+
   <a href="YOUR_GITHUB_REPO_LINK">
     <img src="https://img.shields.io/badge/💻%20GitHub-Repository-0A0A0A?style=for-the-badge" />
+  </a>
+
+  <a href="YOUR_VIDEO_LINK">
+    <img src="https://img.shields.io/badge/🎥%20Demo%20Video-Watch%20Demo-0A0A0A?style=for-the-badge" />
   </a>
 </p>
 
