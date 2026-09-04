@@ -4,6 +4,7 @@ const Order = require('../models/Order');
 const crypto = require('crypto');
 
 const { checkCartThresholds } = require('../services/threshold_service');
+
 const {
   checkTransactionLimit,
 } = require('../services/guardrails_service');
@@ -16,7 +17,15 @@ const {
   logEvent,
 } = require('../services/audit_service');
 
-const generateCheckoutSignature = (sessionId, cartItems) => {
+
+// ============================================================
+// CHECKOUT IDEMPOTENCY SIGNATURE
+// ============================================================
+
+const generateCheckoutSignature = (
+  sessionId,
+  cartItems
+) => {
   const sortedItems = cartItems
     .map(
       (item) =>
@@ -25,7 +34,8 @@ const generateCheckoutSignature = (sessionId, cartItems) => {
     .sort()
     .join('|');
 
-  const rawString = `${sessionId}|${sortedItems}`;
+  const rawString =
+    `${sessionId}|${sortedItems}`;
 
   return crypto
     .createHash('sha256')
@@ -33,9 +43,19 @@ const generateCheckoutSignature = (sessionId, cartItems) => {
     .digest('hex');
 };
 
+
+// ============================================================
+// AI TOOL DEFINITIONS
+// ============================================================
+
 const toolDefinitions = [
   {
     functionDeclarations: [
+
+      // --------------------------------------------------------
+      // SEARCH PRODUCTS
+      // --------------------------------------------------------
+
       {
         name: 'search_products',
         description:
@@ -53,6 +73,11 @@ const toolDefinitions = [
         },
       },
 
+
+      // --------------------------------------------------------
+      // GET PRODUCT DETAILS
+      // --------------------------------------------------------
+
       {
         name: 'get_product_details',
         description:
@@ -69,6 +94,38 @@ const toolDefinitions = [
           required: ['productId'],
         },
       },
+
+
+      // --------------------------------------------------------
+      // GET SIMILAR PRODUCTS
+      // --------------------------------------------------------
+
+      {
+        name: 'get_similar_products',
+        description:
+          'Find similar alternative products to a product the customer is viewing or discussing. Use this when the customer asks for similar products, alternatives, comparable products, other options, or something like the current product.',
+        parameters: {
+          type: 'object',
+          properties: {
+            productId: {
+              type: 'string',
+              description:
+                'MongoDB product ID of the product for which similar alternatives should be found.',
+            },
+            category: {
+              type: 'string',
+              description:
+                'Optional category of the product, such as keyboards, mouse, monitors, audio, accessories, or mousepads.',
+            },
+          },
+          required: ['productId'],
+        },
+      },
+
+
+      // --------------------------------------------------------
+      // ADD TO CART
+      // --------------------------------------------------------
 
       {
         name: 'add_to_cart',
@@ -92,6 +149,11 @@ const toolDefinitions = [
         },
       },
 
+
+      // --------------------------------------------------------
+      // REMOVE FROM CART
+      // --------------------------------------------------------
+
       {
         name: 'remove_from_cart',
         description:
@@ -109,6 +171,11 @@ const toolDefinitions = [
         },
       },
 
+
+      // --------------------------------------------------------
+      // CHECKOUT
+      // --------------------------------------------------------
+
       {
         name: 'checkout',
         description:
@@ -125,6 +192,11 @@ const toolDefinitions = [
           required: ['confirmed'],
         },
       },
+
+
+      // --------------------------------------------------------
+      // UPSELL RECOMMENDATIONS
+      // --------------------------------------------------------
 
       {
         name: 'get_upsell_recommendations',
@@ -144,9 +216,17 @@ const toolDefinitions = [
                 'Product category.',
             },
           },
-          required: ['productId', 'category'],
+          required: [
+            'productId',
+            'category',
+          ],
         },
       },
+
+
+      // --------------------------------------------------------
+      // CART THRESHOLDS
+      // --------------------------------------------------------
 
       {
         name: 'check_cart_thresholds',
@@ -164,59 +244,81 @@ const toolDefinitions = [
           required: ['cartTotal'],
         },
       },
+
     ],
   },
 ];
 
-const executeSearchProducts = async ({ keyword }) => {
+
+// ============================================================
+// SEARCH PRODUCTS
+// ============================================================
+
+const executeSearchProducts = async ({
+  keyword,
+}) => {
   try {
-    const products = await Product.find({
-      $or: [
-        {
-          name: {
-            $regex: keyword,
-            $options: 'i',
+
+    const products =
+      await Product.find({
+        $or: [
+          {
+            name: {
+              $regex: keyword,
+              $options: 'i',
+            },
           },
-        },
-        {
-          description: {
-            $regex: keyword,
-            $options: 'i',
+          {
+            description: {
+              $regex: keyword,
+              $options: 'i',
+            },
           },
-        },
-        {
-          category: {
-            $regex: keyword,
-            $options: 'i',
+          {
+            category: {
+              $regex: keyword,
+              $options: 'i',
+            },
           },
-        },
-      ],
-    });
+        ],
+      });
 
     return {
       success: true,
       count: products.length,
-      products: products.map((product) => ({
-        id: product._id,
-        name: product.name,
-        price: product.price,
-        stock: product.stock,
-        features: product.features,
-        category: product.category,
-      })),
+
+      products: products.map(
+        (product) => ({
+          id: product._id,
+          name: product.name,
+          price: product.price,
+          stock: product.stock,
+          features: product.features,
+          category: product.category,
+        })
+      ),
     };
+
   } catch (error) {
+
     return {
       success: false,
       error: error.message,
     };
+
   }
 };
+
+
+// ============================================================
+// GET PRODUCT DETAILS
+// ============================================================
 
 const executeGetProductDetails = async ({
   productId,
 }) => {
   try {
+
     const product =
       await Product.findById(productId);
 
@@ -229,36 +331,157 @@ const executeGetProductDetails = async ({
 
     return {
       success: true,
+
       product: {
         id: product._id,
         name: product.name,
-        description: product.description,
+        description:
+          product.description,
         price: product.price,
         stock: product.stock,
         features: product.features,
         category: product.category,
       },
     };
+
   } catch (error) {
+
     return {
       success: false,
       error: error.message,
     };
+
   }
 };
 
-const executeAddToCart = async (
-  { productId, quantity = 1 },
-  sessionId
-) => {
+
+// ============================================================
+// GET SIMILAR PRODUCTS
+// ============================================================
+
+const executeGetSimilarProducts = async ({
+  productId,
+  category,
+}) => {
   try {
+
+    // Find the original product
     const product =
       await Product.findById(productId);
 
     if (!product) {
       return {
         success: false,
-        error: 'Product not found',
+        error: 'Product not found.',
+      };
+    }
+
+    // Use actual product category
+    // instead of trusting AI supplied category
+    const productCategory =
+      product.category;
+
+    // Find products from same category
+    // excluding current product
+    const similarProducts =
+      await Product.find({
+        _id: {
+          $ne: product._id,
+        },
+
+        category: {
+          $regex:
+            `^${productCategory}$`,
+          $options: 'i',
+        },
+
+        stock: {
+          $gt: 0,
+        },
+
+        purchase_supported: true,
+      })
+        .limit(5)
+        .select(
+          '_id name description price stock category features'
+        );
+
+    return {
+      success: true,
+
+      originalProduct: {
+        productId:
+          product._id,
+        name:
+          product.name,
+        category:
+          product.category,
+      },
+
+      count:
+        similarProducts.length,
+
+      products:
+        similarProducts.map(
+          (item) => ({
+            productId:
+              item._id,
+            name:
+              item.name,
+            description:
+              item.description,
+            price:
+              item.price,
+            stock:
+              item.stock,
+            category:
+              item.category,
+            features:
+              item.features,
+          })
+        ),
+    };
+
+  } catch (error) {
+
+    console.error(
+      'SIMILAR PRODUCTS ERROR:',
+      error
+    );
+
+    return {
+      success: false,
+      error: error.message,
+    };
+
+  }
+};
+
+
+// ============================================================
+// ADD TO CART
+// ============================================================
+
+const executeAddToCart = async (
+  {
+    productId,
+    quantity = 1,
+  },
+  sessionId
+) => {
+
+  try {
+
+    const product =
+      await Product.findById(
+        productId
+      );
+
+    if (!product) {
+      return {
+        success: false,
+        error:
+          'Product not found',
       };
     }
 
@@ -266,12 +489,15 @@ const executeAddToCart = async (
       Number(quantity);
 
     if (
-      !Number.isInteger(requestedQuantity) ||
+      !Number.isInteger(
+        requestedQuantity
+      ) ||
       requestedQuantity < 1
     ) {
       return {
         success: false,
-        error: 'Invalid quantity',
+        error:
+          'Invalid quantity',
       };
     }
 
@@ -288,15 +514,21 @@ const executeAddToCart = async (
 
     let cart =
       await Cart.findOne({
-        session_id: sessionId,
-        status: 'active',
+        session_id:
+          sessionId,
+        status:
+          'active',
       });
 
     if (!cart) {
-      cart = await Cart.create({
-        session_id: sessionId,
-        item: [],
-      });
+
+      cart =
+        await Cart.create({
+          session_id:
+            sessionId,
+          item: [],
+        });
+
     }
 
     const existingItemIndex =
@@ -306,12 +538,20 @@ const executeAddToCart = async (
           productId
       );
 
-    if (existingItemIndex !== -1) {
+    if (
+      existingItemIndex !== -1
+    ) {
+
       const newQuantity =
-        cart.item[existingItemIndex].quantity +
+        cart.item[
+          existingItemIndex
+        ].quantity +
         requestedQuantity;
 
-      if (newQuantity > product.stock) {
+      if (
+        newQuantity >
+        product.stock
+      ) {
         return {
           success: false,
           error:
@@ -321,13 +561,22 @@ const executeAddToCart = async (
 
       cart.item[
         existingItemIndex
-      ].quantity = newQuantity;
+      ].quantity =
+        newQuantity;
+
     } else {
+
       cart.item.push({
-        product: product._id,
-        quantity: requestedQuantity,
-        priceAtAdd: product.price,
+        product:
+          product._id,
+
+        quantity:
+          requestedQuantity,
+
+        priceAtAdd:
+          product.price,
       });
+
     }
 
     await cart.save();
@@ -347,35 +596,54 @@ const executeAddToCart = async (
       );
 
     return {
+
       success: true,
+
       message:
         `Added ${requestedQuantity} x ${product.name} to cart.`,
+
       totalAmount,
+
       thresholdInfo,
     };
+
   } catch (error) {
+
     return {
       success: false,
       error: error.message,
     };
+
   }
 };
 
+
+// ============================================================
+// REMOVE FROM CART
+// ============================================================
+
 const executeRemoveFromCart = async (
-  { productId },
+  {
+    productId,
+  },
   sessionId
 ) => {
+
   try {
+
     const cart =
       await Cart.findOne({
-        session_id: sessionId,
-        status: 'active',
+        session_id:
+          sessionId,
+        status:
+          'active',
       });
 
     if (!cart) {
       return {
         success: false,
-        error: 'Cart not found.',
+        error:
+          'Cart not found.',
       };
     }
 
@@ -389,7 +657,8 @@ const executeRemoveFromCart = async (
     if (!itemExists) {
       return {
         success: false,
-        error: 'Item is not in the cart.',
+        error:
+          'Item is not in the cart.',
       };
     }
 
@@ -412,154 +681,261 @@ const executeRemoveFromCart = async (
       );
 
     return {
+
       success: true,
+
       message:
         'Item removed from cart.',
+
       totalAmount,
     };
+
   } catch (error) {
+
     return {
       success: false,
       error: error.message,
     };
+
   }
 };
 
-const handleGetUpsellRecommendations = async ({
-  productId,
-}) => {
-  try {
-    const product =
-      await Product.findById(productId);
 
-    if (!product) {
-      return {
-        success: false,
-        error: 'Product not found.',
-      };
-    }
+// ============================================================
+// UPSELL RECOMMENDATIONS
+// ============================================================
 
-    const productName =
-      product.name.toLowerCase();
+const handleGetUpsellRecommendations =
+  async ({
+    productId,
+  }) => {
 
-    const productCategory =
-      (product.category || '').toLowerCase();
+    try {
 
-    let complementaryCategories = [];
-
-    if (
-      productName.includes('mouse') ||
-      productCategory.includes('mouse')
-    ) {
-      complementaryCategories = [
-        'keyboard',
-        'keyboards',
-      ];
-    } else if (
-      productName.includes('keyboard') ||
-      productCategory.includes('keyboard')
-    ) {
-      complementaryCategories = [
-        'mouse',
-        'mice',
-      ];
-    } else if (
-      productName.includes('headphone') ||
-      productName.includes('headset')
-    ) {
-      complementaryCategories = [
-        'mouse',
-        'keyboard',
-      ];
-    }
-
-    if (
-      complementaryCategories.length === 0
-    ) {
-      return {
-        success: true,
-        recommendations: [],
-      };
-    }
-
-    const recommendations =
-      await Product.find({
-        _id: {
-          $ne: productId,
-        },
-        stock: {
-          $gt: 0,
-        },
-        $or: [
-          ...complementaryCategories.map(
-            (category) => ({
-              category: {
-                $regex:
-                  `^${category}$`,
-                $options: 'i',
-              },
-            })
-          ),
-          ...complementaryCategories.map(
-            (category) => ({
-              name: {
-                $regex: category,
-                $options: 'i',
-              },
-            })
-          ),
-        ],
-      })
-        .limit(2)
-        .select(
-          '_id name price stock category features'
+      const product =
+        await Product.findById(
+          productId
         );
 
-    return {
-      success: true,
-      recommendations:
-        recommendations.map(
-          (item) => ({
-            productId: item._id,
-            name: item.name,
-            price: item.price,
-            stock: item.stock,
-            category: item.category,
-            features: item.features,
-          })
-        ),
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
-};
+      if (!product) {
+        return {
+          success: false,
+          error:
+            'Product not found.',
+        };
+      }
+
+      const productName =
+        product.name.toLowerCase();
+
+      const productCategory =
+        (
+          product.category || ''
+        ).toLowerCase();
+
+      let complementaryCategories =
+        [];
+
+
+      // Mouse → Keyboard
+      if (
+        productName.includes(
+          'mouse'
+        ) ||
+        productCategory.includes(
+          'mouse'
+        )
+      ) {
+
+        complementaryCategories = [
+          'keyboard',
+          'keyboards',
+        ];
+
+      }
+
+
+      // Keyboard → Mouse
+      else if (
+        productName.includes(
+          'keyboard'
+        ) ||
+        productCategory.includes(
+          'keyboard'
+        )
+      ) {
+
+        complementaryCategories = [
+          'mouse',
+          'mice',
+        ];
+
+      }
+
+
+      // Headphones / Headset → Mouse + Keyboard
+      else if (
+        productName.includes(
+          'headphone'
+        ) ||
+        productName.includes(
+          'headset'
+        )
+      ) {
+
+        complementaryCategories = [
+          'mouse',
+          'keyboard',
+        ];
+
+      }
+
+
+      // Nothing relevant
+      if (
+        complementaryCategories.length ===
+        0
+      ) {
+
+        return {
+          success: true,
+          recommendations: [],
+        };
+
+      }
+
+
+      const recommendations =
+        await Product.find({
+
+          _id: {
+            $ne: productId,
+          },
+
+          stock: {
+            $gt: 0,
+          },
+
+          $or: [
+
+            ...complementaryCategories.map(
+              (category) => ({
+                category: {
+                  $regex:
+                    `^${category}$`,
+                  $options: 'i',
+                },
+              })
+            ),
+
+            ...complementaryCategories.map(
+              (category) => ({
+                name: {
+                  $regex:
+                    category,
+                  $options: 'i',
+                },
+              })
+            ),
+
+          ],
+
+        })
+          .limit(2)
+          .select(
+            '_id name price stock category features'
+          );
+
+
+      return {
+
+        success: true,
+
+        recommendations:
+          recommendations.map(
+            (item) => ({
+
+              productId:
+                item._id,
+
+              name:
+                item.name,
+
+              price:
+                item.price,
+
+              stock:
+                item.stock,
+
+              category:
+                item.category,
+
+              features:
+                item.features,
+
+            })
+          ),
+
+      };
+
+    } catch (error) {
+
+      return {
+        success: false,
+        error: error.message,
+      };
+
+    }
+  };
+
+
+// ============================================================
+// CHECKOUT
+// ============================================================
 
 const executeCheckout = async (
-  { confirmed = false },
+  {
+    confirmed = false,
+  },
   sessionId
 ) => {
+
   try {
+
     const cart =
       await Cart.findOne({
-        session_id: sessionId,
-        status: 'active',
+        session_id:
+          sessionId,
+
+        status:
+          'active',
+
       }).populate(
         'item.product'
       );
+
+
+    // --------------------------------------------------------
+    // EMPTY CART
+    // --------------------------------------------------------
 
     if (
       !cart ||
       cart.item.length === 0
     ) {
+
       return {
         success: false,
         error:
           'Cart is empty. Nothing to checkout.',
       };
+
     }
+
+
+    // --------------------------------------------------------
+    // IDEMPOTENCY SIGNATURE
+    // --------------------------------------------------------
 
     const signature =
       generateCheckoutSignature(
@@ -567,51 +943,98 @@ const executeCheckout = async (
         cart.item
       );
 
+
     const twoMinutesAgo =
       new Date(
         Date.now() -
           2 * 60 * 1000
       );
 
+
+    // --------------------------------------------------------
+    // FIND EXISTING CHECKOUT
+    // --------------------------------------------------------
+
     let existingOrder =
       await Order.findOne({
-        session_Id: sessionId,
+
+        session_Id:
+          sessionId,
+
         checkoutSignature:
           signature,
+
         createdAt: {
-          $gte: twoMinutesAgo,
+          $gte:
+            twoMinutesAgo,
         },
+
       });
 
+
+    // --------------------------------------------------------
+    // EXISTING ORDER FOUND
+    // --------------------------------------------------------
+
     if (existingOrder) {
+
+
+      // Already paid
       if (
-        existingOrder.status === 'paid'
+        existingOrder.status ===
+        'paid'
       ) {
+
         return {
           success: false,
           error:
             'This order has already been paid.',
         };
+
       }
+
+
+      // ------------------------------------------------------
+      // EXISTING HIGH VALUE ORDER
+      // ------------------------------------------------------
 
       if (
         existingOrder.required_Approval &&
         existingOrder.status ===
           'pending_confirmation'
       ) {
+
+
+        // Still waiting for confirmation
         if (!confirmed) {
+
           return {
+
             success: true,
-            requiresConfirmation: true,
+
+            requiresConfirmation:
+              true,
+
             orderId:
               existingOrder._id.toString(),
+
             totalAmount:
               existingOrder.total_price,
-            transactionLimit: 2000,
+
+            transactionLimit:
+              2000,
+
             message:
               `Your cart total is ₹${existingOrder.total_price}, which exceeds the autonomous checkout limit of ₹2000. Please confirm the purchase before payment can proceed.`,
+
           };
+
         }
+
+
+        // ----------------------------------------------------
+        // CUSTOMER CONFIRMED
+        // ----------------------------------------------------
 
         const razorpayOrder =
           await createRazorpayOrder(
@@ -619,7 +1042,9 @@ const executeCheckout = async (
             existingOrder._id.toString()
           );
 
-        existingOrder.razorpay_order_Id =
+
+        existingOrder
+          .razorpay_order_Id =
           razorpayOrder.id;
 
         existingOrder.status =
@@ -628,85 +1053,152 @@ const executeCheckout = async (
         existingOrder.required_Approval =
           false;
 
+
         await existingOrder.save();
 
+
         await logEvent({
+
           action:
             'CUSTOMER_CONFIRMED_CHECKOUT',
-          actor: 'ai',
+
+          actor:
+            'ai',
+
           amount:
             existingOrder.total_price,
+
           reason:
             'Customer explicitly confirmed a checkout above the autonomous transaction limit.',
+
           reasoningTrace:
             `Customer confirmed the ₹${existingOrder.total_price} purchase. Razorpay payment order was created after explicit confirmation.`,
+
           decisionType:
             'CUSTOMER_CONFIRMED',
+
           relatedOrder:
             existingOrder._id,
+
           sessionId,
+
           approvalStatus:
             'approved',
-          result: 'success',
+
+          result:
+            'success',
+
         });
 
+
         return {
+
           success: true,
-          requiresConfirmation: false,
+
+          requiresConfirmation:
+            false,
+
           orderId:
             existingOrder._id.toString(),
+
           razorpayOrderId:
             razorpayOrder.id,
+
           razorpayKeyId:
             process.env.RAZORPAY_KEY_ID,
+
           totalAmount:
             existingOrder.total_price,
+
           message:
             'Purchase confirmed. Payment is ready.',
+
         };
+
       }
+
+
+      // ------------------------------------------------------
+      // EXISTING RAZORPAY ORDER
+      // ------------------------------------------------------
 
       if (
         existingOrder.razorpay_order_Id &&
-        existingOrder.status !== 'failed' &&
-        existingOrder.status !== 'rejected'
+        existingOrder.status !==
+          'failed' &&
+        existingOrder.status !==
+          'rejected'
       ) {
+
         return {
+
           success: true,
-          requiresConfirmation: false,
+
+          requiresConfirmation:
+            false,
+
           orderId:
             existingOrder._id.toString(),
+
           razorpayOrderId:
-            existingOrder.razorpay_order_Id,
+            existingOrder
+              .razorpay_order_Id,
+
           razorpayKeyId:
             process.env.RAZORPAY_KEY_ID,
+
           totalAmount:
             existingOrder.total_price,
+
           message:
             'Payment is already ready.',
+
         };
+
       }
+
     }
+
+
+    // --------------------------------------------------------
+    // CALCULATE TOTAL
+    // --------------------------------------------------------
 
     let total = 0;
 
-    const orderItems =
-      cart.item.map((item) => {
-        total +=
-          item.priceAtAdd *
-          item.quantity;
 
-        return {
-          product:
-            item.product._id,
-          name:
-            item.product.name,
-          quantity:
-            item.quantity,
-          price:
-            item.priceAtAdd,
-        };
-      });
+    const orderItems =
+      cart.item.map(
+        (item) => {
+
+          total +=
+            item.priceAtAdd *
+            item.quantity;
+
+
+          return {
+
+            product:
+              item.product._id,
+
+            name:
+              item.product.name,
+
+            quantity:
+              item.quantity,
+
+            price:
+              item.priceAtAdd,
+
+          };
+
+        }
+      );
+
+
+    // --------------------------------------------------------
+    // GUARDRAIL CHECK
+    // --------------------------------------------------------
 
     const guardrailCheck =
       await checkTransactionLimit(
@@ -714,74 +1206,143 @@ const executeCheckout = async (
         sessionId
       );
 
+
+    // --------------------------------------------------------
+    // CREATE ORDER
+    // --------------------------------------------------------
+
     const order =
       await Order.create({
+
         session_Id:
           sessionId,
+
         item:
           orderItems,
+
         total_price:
           total,
+
         razorpay_order_Id:
           null,
+
         status:
-          guardrailCheck.requiresApproval
+          guardrailCheck
+            .requiresApproval
             ? 'pending_confirmation'
             : 'created',
+
         required_Approval:
-          guardrailCheck.requiresApproval,
+          guardrailCheck
+            .requiresApproval,
+
         checkoutSignature:
           signature,
+
       });
 
+
+    // --------------------------------------------------------
+    // AUDIT CHECKOUT
+    // --------------------------------------------------------
+
     await logEvent({
+
       action:
-        guardrailCheck.requiresApproval
+        guardrailCheck
+          .requiresApproval
           ? 'CUSTOMER_CONFIRMATION_REQUIRED'
           : 'checkout_initiated',
-      actor: 'ai',
-      amount: total,
+
+      actor:
+        'ai',
+
+      amount:
+        total,
+
       reason:
-        guardrailCheck.requiresApproval
+        guardrailCheck
+          .requiresApproval
           ? guardrailCheck.reason
           : `AI initiated checkout with ${orderItems.length} item(s).`,
+
       reasoningTrace:
-        guardrailCheck.requiresApproval
+        guardrailCheck
+          .requiresApproval
+
           ? `Cart total ₹${total} exceeds the autonomous limit of ₹${guardrailCheck.transactionLimit}. Explicit customer confirmation is required.`
+
           : `Cart total ₹${total} is within the autonomous limit of ₹${guardrailCheck.transactionLimit}.`,
+
       decisionType:
-        guardrailCheck.requiresApproval
+        guardrailCheck
+          .requiresApproval
+
           ? 'CUSTOMER_CONFIRMATION_REQUIRED'
+
           : 'AUTONOMOUS_APPROVED',
+
       relatedOrder:
         order._id,
+
       sessionId,
+
       approvalStatus:
-        guardrailCheck.requiresApproval
+        guardrailCheck
+          .requiresApproval
+
           ? 'pending'
+
           : 'not_required',
-      result: 'success',
+
+      result:
+        'success',
+
     });
+
+
+    // --------------------------------------------------------
+    // HIGH VALUE → REQUIRE CONFIRMATION
+    // --------------------------------------------------------
 
     if (
       guardrailCheck.requiresApproval
     ) {
+
       return {
+
         success: true,
-        requiresConfirmation: true,
+
+        requiresConfirmation:
+          true,
+
         orderId:
           order._id.toString(),
-        totalAmount: total,
+
+        totalAmount:
+          total,
+
         transactionLimit:
-          guardrailCheck.transactionLimit,
+          guardrailCheck
+            .transactionLimit,
+
         reason:
           guardrailCheck.reason,
+
         status:
           'PENDING_CUSTOMER_CONFIRMATION',
+
         message:
           `Your cart total is ₹${total}, which exceeds our ₹${guardrailCheck.transactionLimit} autonomous checkout limit. Please confirm this purchase before payment can proceed.`,
+
       };
+
     }
+
+
+    // --------------------------------------------------------
+    // AUTONOMOUS PAYMENT
+    // --------------------------------------------------------
 
     const razorpayOrder =
       await createRazorpayOrder(
@@ -789,44 +1350,82 @@ const executeCheckout = async (
         order._id.toString()
       );
 
+
     order.razorpay_order_Id =
       razorpayOrder.id;
 
+
     await order.save();
 
+
+    // --------------------------------------------------------
+    // PAYMENT AUDIT
+    // --------------------------------------------------------
+
     await logEvent({
+
       action:
         'payment_order_created',
-      actor: 'system',
-      amount: total,
+
+      actor:
+        'system',
+
+      amount:
+        total,
+
       reason:
         'Razorpay order created through autonomous AI checkout.',
+
       reasoningTrace:
         `Cart total ₹${total} is within the ₹${guardrailCheck.transactionLimit} autonomous spending limit.`,
+
       decisionType:
         'AUTONOMOUS_APPROVED',
+
       relatedOrder:
         order._id,
+
       sessionId,
+
       approvalStatus:
         'not_required',
-      result: 'success',
+
+      result:
+        'success',
+
     });
 
+
+    // --------------------------------------------------------
+    // RETURN PAYMENT INFORMATION
+    // --------------------------------------------------------
+
     return {
+
       success: true,
-      requiresConfirmation: false,
+
+      requiresConfirmation:
+        false,
+
       orderId:
         order._id.toString(),
+
       razorpayOrderId:
         razorpayOrder.id,
+
       razorpayKeyId:
         process.env.RAZORPAY_KEY_ID,
-      totalAmount: total,
+
+      totalAmount:
+        total,
+
       message:
         'Payment is ready. Opening secure Razorpay Checkout.',
+
     };
+
   } catch (error) {
+
     console.error(
       'CHECKOUT TOOL ERROR:',
       error
@@ -836,25 +1435,50 @@ const executeCheckout = async (
       success: false,
       error: error.message,
     };
+
   }
 };
+
+
+// ============================================================
+// CART THRESHOLDS TOOL
+// ============================================================
 
 const checkCartThresholdsTool = (
   cartTotal
 ) => {
+
   return checkCartThresholds(
     cartTotal
   );
+
 };
 
+
+// ============================================================
+// EXPORTS
+// ============================================================
+
 module.exports = {
+
   toolDefinitions,
+
   executeSearchProducts,
+
   executeGetProductDetails,
+
+  // NEW
+  executeGetSimilarProducts,
+
   executeAddToCart,
+
   executeRemoveFromCart,
+
   executeCheckout,
+
   handleGetUpsellRecommendations,
+
   checkCartThresholds:
     checkCartThresholdsTool,
+
 };
