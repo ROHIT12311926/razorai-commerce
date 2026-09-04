@@ -977,6 +977,549 @@ Backend-enforced transaction limits, explicit confirmation, stock validation, id
 
 <div align="center">
 
+---
+
+### 🧠 Explainable, Bounded & Gated AI
+
+RazorAI does not allow an AI agent to directly control financial transactions without safeguards.
+
+The transaction system follows three core principles:
+
+```text
+🧠 Explainable
+       +
+🛡️ Bounded
+       +
+🚪 Gated
+       ↓
+Safe AI-Assisted Commerce
+```
+
+---
+
+#### 🧠 1. Explainable — Why Did This Action Happen?
+
+Every important transaction-related action is recorded with a clear `reason`.
+
+This makes the AI's decision understandable and traceable instead of being a black-box action.
+
+For example:
+
+```text
+Cart Total: ₹3698
+Autonomous Limit: ₹2000
+
+        ↓
+
+Transaction Limit Check
+
+        ↓
+
+❌ Limit Exceeded
+
+        ↓
+
+Approval Required
+
+Reason:
+"Amount ₹3698 exceeds autonomous limit of ₹2000"
+```
+
+For a transaction within the autonomous limit:
+
+```text
+Cart Total: ₹1799
+Autonomous Limit: ₹2000
+
+        ↓
+
+Transaction Limit Check
+
+        ↓
+
+✅ Within Limit
+
+        ↓
+
+AI Allowed To Proceed
+
+Reason:
+"Cart total ₹1799 is within the autonomous limit,
+AI is allowed to proceed autonomously"
+```
+
+The system therefore records **why** a transaction was allowed, blocked, or escalated.
+
+---
+
+#### 🛡️ 2. Bounded — AI Has a Financial Boundary
+
+RazorAI enforces a strict autonomous transaction guardrail of:
+
+# ₹2,000
+
+The transaction is checked using the backend:
+
+```javascript
+checkTransactionLimit()
+```
+
+The check happens before financial execution.
+
+```text
+                 CHECKOUT
+                    │
+                    ▼
+        ┌────────────────────────┐
+        │ checkTransactionLimit()│
+        └────────────┬───────────┘
+                     │
+                     ▼
+              Amount <= ₹2000?
+                     │
+             ┌───────┴───────┐
+             │               │
+            YES              NO
+             │               │
+             ▼               ▼
+       Autonomous        Approval
+       Transaction       Required
+```
+
+If the amount exceeds the configured limit:
+
+```json
+{
+  "requiresApproval": true
+}
+```
+
+This guardrail is enforced by the **backend**, meaning the AI cannot simply bypass the transaction limit.
+
+```text
+AI
+ ↓
+Transaction Request
+ ↓
+Backend Validation
+ ↓
+₹2000 Guardrail
+ ↓
+┌───────────────┐
+│               │
+▼               ▼
+ALLOW         BLOCK /
+              APPROVAL
+```
+
+> **The AI can request a transaction, but the backend controls the financial boundary.**
+
+---
+
+#### 🚪 3. Gated — High-Value Transactions Require Approval
+
+Transactions above ₹2,000 cannot directly create a Razorpay order.
+
+They first enter a pending approval state.
+
+```text
+K8 Wireless Mechanical Keyboard
+₹2299
+        ↓
+Autonomous Limit Exceeded
+        ↓
+requiresApproval = true
+        ↓
+PENDING_APPROVAL
+        ↓
+Human Approval
+        ↓
+POST /api/order/:orderId/approve
+        ↓
+Razorpay Order Created
+        ↓
+Payment
+```
+
+Before approval:
+
+```text
+₹2299 Transaction
+      ↓
+Limit Exceeded
+      ↓
+Approval Required
+      ↓
+❌ Razorpay Order NOT Created
+```
+
+After approval:
+
+```text
+Human Approval
+      ↓
+POST /api/order/:orderId/approve
+      ↓
+Backend Validation
+      ↓
+✅ Razorpay Order Created
+      ↓
+Payment
+```
+
+> **No approval → No Razorpay order.**
+
+This creates a clear safety boundary between:
+
+```text
+AI Decision-Making
+        ↓
+Backend Guardrails
+        ↓
+Human Approval
+        ↓
+Financial Execution
+```
+
+---
+
+### 🧾 Audit Trail — Every Important Action Is Traceable
+
+RazorAI maintains an `AuditLog` MongoDB collection to record important AI and commerce events.
+
+The audit trail covers actions such as:
+
+- 🔎 Product Search
+- 🛒 Cart Add
+- 🗑️ Cart Remove
+- 💳 Checkout
+- 🛡️ Transaction Limit Check
+- 🚪 Approval Required
+- 👤 Human Approval
+- 💰 Payment Verification
+- ✅ Payment Success
+- ❌ Payment Failure
+
+Each audit entry can contain:
+
+```text
+action
+actor
+amount
+reason
+sessionId
+approvalStatus
+result
+timestamp
+```
+
+Example:
+
+```json
+{
+  "action": "TRANSACTION_ESCALATED",
+  "actor": "AI_AGENT",
+  "amount": 3698,
+  "reason": "Amount ₹3698 exceeds autonomous limit of ₹2000",
+  "sessionId": "session_123",
+  "approvalStatus": "PENDING",
+  "result": "approval_required",
+  "timestamp": "2026-09-04T12:00:00Z"
+}
+```
+
+For an autonomous transaction:
+
+```json
+{
+  "action": "TRANSACTION_LIMIT_CHECK",
+  "actor": "AI_AGENT",
+  "amount": 1799,
+  "reason": "Cart total ₹1799 is within the autonomous limit, AI is allowed to proceed autonomously",
+  "sessionId": "session_123",
+  "approvalStatus": "NOT_REQUIRED",
+  "result": "allowed"
+}
+```
+
+The complete audit history can be retrieved through:
+
+```http
+GET /api/audit
+```
+
+Logs are returned latest-first, providing a chronological trail of what happened during the commerce session.
+
+---
+
+### 🔍 Audit Flow
+
+```text
+User / AI Agent
+      ↓
+Commerce Action
+      ↓
+Backend
+      ↓
+Validation / Guardrail
+      ↓
+Decision + Reason
+      ↓
+AuditLog
+      ↓
+MongoDB
+      ↓
+GET /api/audit
+```
+
+This provides visibility into not only **what happened**, but also **why it happened**.
+
+---
+
+### 🚨 Graceful Failure Handling
+
+AI-powered commerce also needs to handle failures safely.
+
+RazorAI demonstrates this through **Payment Verification Failure**.
+
+If the Razorpay payment signature cannot be verified, the system treats the payment as unsuccessful instead of marking the order as successfully paid.
+
+```text
+Razorpay Payment
+       ↓
+Payment Details Received
+       ↓
+Signature Verification
+       ↓
+    Signature Valid?
+       │
+   ┌───┴────┐
+   │        │
+  YES      NO
+   │        │
+   ▼        ▼
+SUCCESS   FAILURE
+            │
+            ▼
+      Order = "failed"
+            │
+            ▼
+      Cart Preserved
+            │
+            ▼
+      Audit Log Created
+            │
+            ▼
+       Retry Payment
+```
+
+---
+
+#### ❌ Payment Verification Failure
+
+If the Razorpay signature verification fails:
+
+```text
+Payment Verification
+        ↓
+❌ Invalid / Failed Signature
+        ↓
+Order Status = "failed"
+```
+
+The cart is **not deleted**.
+
+Instead:
+
+```text
+Payment Failure
+      ↓
+Order marked "failed"
+      ↓
+Cart Preserved
+      ↓
+Failure Recorded in AuditLog
+      ↓
+Customer Can Retry
+```
+
+This prevents the customer from losing their shopping state because of a failed or invalid payment attempt.
+
+---
+
+### 🔄 Retry Payment
+
+When payment verification fails, the frontend displays a dedicated failure state:
+
+```text
+┌──────────────────────────────────────┐
+│                                      │
+│    ❌ Payment Couldn't Be Completed  │
+│                                      │
+│    Your payment could not be         │
+│    verified.                         │
+│                                      │
+│    Your cart has been preserved      │
+│    so you can try again.             │
+│                                      │
+│       [ 🔄 Retry Payment ]           │
+│                                      │
+└──────────────────────────────────────┘
+```
+
+The customer can select:
+
+```text
+🔄 Retry Payment
+```
+
+and return to the existing cart / checkout flow.
+
+---
+
+### 🧪 Failure Scenario
+
+A tampered or invalid Razorpay payment signature is handled as follows:
+
+```text
+                 PAYMENT
+                    │
+                    ▼
+          Signature Verification
+                    │
+                    ▼
+              ❌ INVALID
+                    │
+          ┌─────────┼─────────┐
+          │         │         │
+          ▼         ▼         ▼
+       Order      Cart      Audit
+       Failed   Preserved   Logged
+          │         │         │
+          └─────────┼─────────┘
+                    │
+                    ▼
+             Retry Payment
+```
+
+### Result
+
+| Component | Result |
+|-----------|--------|
+| Payment | ❌ Failed |
+| Order | `failed` |
+| Cart | ✅ Preserved |
+| Audit Log | ✅ Created |
+| Retry | ✅ Available |
+
+> **A failed payment does not destroy the customer's cart or shopping state.**
+
+---
+
+### 🔐 Complete Transaction Safety Flow
+
+```text
+                         USER
+                           │
+                           ▼
+                  CONVERSATIONAL AI
+                           │
+                           ▼
+                  TRANSACTION REQUEST
+                           │
+                           ▼
+                  🧠 EXPLAINABLE
+                  Reason + AI Trace
+                           │
+                           ▼
+                   🛡️ BOUNDED
+                    ₹2,000 Limit
+                           │
+                 ┌─────────┴─────────┐
+                 │                   │
+              <= ₹2000            > ₹2000
+                 │                   │
+                 ▼                   ▼
+            Autonomous        Approval Required
+            Transaction              │
+                                     ▼
+                              Human Approval
+                                     │
+                                     ▼
+                          /api/order/:orderId/approve
+                                     │
+                                     ▼
+                               Razorpay Order
+                                     │
+                                     ▼
+                                  Payment
+                                     │
+                           ┌─────────┴─────────┐
+                           │                   │
+                         VALID              INVALID
+                           │                   │
+                           ▼                   ▼
+                        SUCCESS             FAILURE
+                           │                   │
+                           │                   ▼
+                           │             Order = failed
+                           │                   │
+                           │                   ▼
+                           │             Cart Preserved
+                           │                   │
+                           │                   ▼
+                           │              Retry Payment
+                           │
+                           ▼
+                       Audit Trail
+                           │
+                           ▼
+                   Merchant Dashboard
+```
+
+---
+
+### 🎯 Explainable + Bounded + Gated
+
+Together, these mechanisms ensure that AI-driven commerce remains controlled and auditable.
+
+```text
+🧠 EXPLAINABLE
+       │
+       │  Why did this happen?
+       ▼
+Reason + Decision Trace
+       │
+       ▼
+🛡️ BOUNDED
+       │
+       │  How much can AI spend autonomously?
+       ▼
+₹2,000 Transaction Guardrail
+       │
+       ▼
+🚪 GATED
+       │
+       │  What happens above the limit?
+       ▼
+Human Approval
+       │
+       ▼
+💳 RAZORPAY
+       │
+       ▼
+🔐 PAYMENT VERIFICATION
+       │
+       ▼
+🧾 AUDIT TRAIL
+```
+
+> **AI can request. Backend decides. Human approval controls high-value transactions. Every important action leaves a trace.**
+
+---
+
+
+
 # 🚀 RazorAI Commerce
 
 ### **From conversational shopping to agentic commerce.**
