@@ -1,4 +1,4 @@
-<!-- <div align="center">
+<div align="center">
 
 # 🤖 RazorAI Commerce
 
@@ -410,4 +410,4 @@ try:Refresh the pageWait a few secondsSend the message againIf it still doesn't 
      RazorAI
 🚀 RazorAI CommerceFrom conversational shopping to agentic commerce.AI can request.
 The backend decides.
-The merchant stays in control. -->
+The merchant stays in control.
