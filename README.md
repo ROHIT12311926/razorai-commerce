@@ -9,10 +9,10 @@ A conversational AI shopping agent that helps users **discover products, compare
 Built for the **Razorpay AI Buildathon** 🚀
 
 <p>
-  <a href="https://razorai-commerce-frontend.onrender.com">
+  <a href="https://razorai-commerce-frontend-store2.onrender.com">
     <img src="https://img.shields.io/badge/🚀%20Live%20Demo-RazorAI-0A0A0A?style=for-the-badge" />
   </a>
-  <a href="YOUR_GITHUB_REPO_LINK">
+  <a href="https://github.com/ROHIT12311926/razorai-commerce/edit/main/README.md">
     <img src="https://img.shields.io/badge/💻%20GitHub-Repository-0A0A0A?style=for-the-badge" />
   </a>
   <a href="YOUR_VIDEO_LINK">
@@ -1605,7 +1605,7 @@ The merchant stays in control.**
 
 <br>
 
-<a href="https://razorai-commerce-frontend.onrender.com">
+<a href="https://razorai-commerce-frontend-store2.onrender.com">
   <img src="https://img.shields.io/badge/🚀%20TRY%20RAZORAI-Live%20Demo-0A0A0A?style=for-the-badge" />
 </a>
 
