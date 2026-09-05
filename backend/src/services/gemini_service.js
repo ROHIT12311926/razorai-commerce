@@ -11,7 +11,7 @@ const {
   executeRemoveFromCart,
   executeCheckout,
   handleGetUpsellRecommendations,
-  getSimilarProducts,
+  executeGetSimilarProducts,  
   checkCartThresholds,
 } = require('./agent_tools');
 
@@ -174,7 +174,7 @@ const executeToolCall = async (functionCall, sessionId) => {
   }
 
   if (name === 'get_similar_products') {
-    return await getSimilarProducts(args);
+    return await executeGetSimilarProducts(args);
   }
 
   if (name === 'check_cart_thresholds') {
@@ -196,7 +196,7 @@ const loadHistory = async (sessionId) => {
     return [];
   }
 
-  return history.messages;
+  return history.messages.slice(-6);
 };
 
 const saveMessage = async (sessionId, role, text) => {
@@ -251,7 +251,7 @@ const chatWithTools = async (userMessage, sessionId) => {
 
   try {
     response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
+      model: 'gemini-3.1-flash-lite',
       contents,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -366,7 +366,7 @@ const chatWithTools = async (userMessage, sessionId) => {
 
     try {
       response = await ai.models.generateContent({
-        model: 'gemini-flash-lite-latest',
+        model: 'gemini-3.1-flash-lite',
         contents,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
