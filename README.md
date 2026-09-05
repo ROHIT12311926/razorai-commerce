@@ -1518,6 +1518,81 @@ Human Approval
 
 ---
 
+🚀 How to Run Locally
+
+Follow these steps to run RazorAI Commerce on your local machine.
+
+1. Clone the Repository
+git clone https://github.com/ROHIT12311926/razorai-commerce.git
+cd razorai-commerce
+2. Backend Setup
+
+Navigate to the backend:
+
+cd backend
+npm install
+
+Create a .env file inside the backend directory:
+
+PORT=5000
+
+MONGODB_URI=your_mongodb_atlas_connection_string
+
+GEMINI_API_KEY=your_gemini_api_key
+
+RAZORPAY_KEY_ID=your_razorpay_test_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_test_key_secret
+
+Start the backend:
+
+npm start
+
+The backend will run on:
+
+http://localhost:5000
+3. Frontend Setup
+
+Open a new terminal and navigate to the frontend:
+
+cd frontend-store
+npm install
+npm run dev
+
+The frontend will be available at the URL shown by Vite, usually:
+
+http://localhost:5173
+4. Required Services
+
+Before running the application, make sure you have:
+
+MongoDB Atlas — for products, carts, orders, and application data
+Google Gemini API — for the AI shopping agent and function calling
+Razorpay Test Mode — for testing the payment flow
+5. Test the Application
+
+Once both frontend and backend are running:
+
+Open the frontend in your browser.
+Interact with the RazorAI shopping assistant.
+Search and compare products using natural language.
+Add or remove products from the cart.
+Proceed to checkout.
+Test the ₹2,000 transaction guardrail.
+Complete payments using Razorpay Test Mode.
+
+
+Merchant Dashboard Setup
+
+Open another terminal:
+
+cd frontend-dashboard
+npm install
+npm run dev
+
+The merchant dashboard will run on:
+
+http://localhost:5174
+
 
 
 # 🚀 RazorAI Commerce
