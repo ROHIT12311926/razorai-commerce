@@ -78,11 +78,11 @@ Merchant Dashboard
 
 |    | Resource                                                                 |
 | -- | ------------------------------------------------------------------------ |
-| 🚀 | **Live Store** — https://razorai-commerce-frontend.onrender.com          |
+| 🚀 | **Live Store** — https://razorai-commerce-frontend-store2.onrender.com          |
 | 📊 | **Merchant Dashboard** — https://razorai-commerce-dashboard.onrender.com |
 | ⚙️ | **Agent Backend** — https://razorai-commerce-backend.onrender.com        |
-| 💻 | **GitHub Repository** — `YOUR_GITHUB_REPO_LINK`                          |
-| 🎥 | **Demo Video** — `YOUR_VIDEO_LINK`                                       |
+| 💻 | **GitHub Repository** — `https://github.com/ROHIT12311926/razorai-commerce/edit/main/README.md`                          |
+| 🎥 | **Demo Video** — `https://drive.google.com/file/d/1-9TX_G3IJ2bQ5vWuQOGxZ9cs0e8fYsm1/view?usp=drive_link`                                       |
 
 ---
 
