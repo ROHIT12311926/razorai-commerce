@@ -82,7 +82,7 @@ Merchant Dashboard
 | 📊 | **Merchant Dashboard** — https://razorai-commerce-dashboard.onrender.com |
 | ⚙️ | **Agent Backend** — https://razorai-commerce-backend.onrender.com        |
 | 💻 | **GitHub Repository** — `https://github.com/ROHIT12311926/razorai-commerce/edit/main/README.md`                          |
-| 🎥 | **Demo Video** — `https://drive.google.com/file/d/1-9TX_G3IJ2bQ5vWuQOGxZ9cs0e8fYsm1/view?usp=drive_link`                                       |
+| 🎥 | **Demo Video** — `https://youtu.be/51VrG6e-N4w`                                       |
 
 ---
 
